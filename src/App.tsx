@@ -7,7 +7,6 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { ActivityFeed } from "@/components/ActivityFeed";
-import { Timeline } from "@/components/Timeline";
 import { MindMap } from "@/components/MindMap";
 import { Onboarding } from "@/components/views/Onboarding";
 import { Reports } from "@/components/views/Reports";
@@ -19,36 +18,47 @@ import { Login } from "@/components/views/Login";
 import { ReactFlowProvider } from "@xyflow/react";
 import { ActiveMonitoringWidget } from "@/components/ActiveMonitoringWidget";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
+import { AppProvider, useAppContext } from "@/AppContext";
 
-export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasOnboarded, setHasOnboarded] = useState(false);
-  const [currentView, setCurrentView] = useState("dashboard");
+function AppInner() {
+  const ctx = useAppContext();
+  const [currentView, setCurrentView] = useState(() => {
+    if (!ctx.isAuthenticated) return "login";
+    if (!ctx.hasOnboarded) return "onboarding";
+    return "dashboard";
+  });
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isGrantSelected, setIsGrantSelected] = useState(false);
+  // Tracks which grant ID is being edited in the ApplicationBuilder
+  const [builderGrantId, setBuilderGrantId] = useState<string | null>(null);
 
   const handleLogin = () => {
-    setIsAuthenticated(true);
-    setHasOnboarded(true); // Assume existing user has onboarded
     setCurrentView("dashboard");
   };
 
   const handleSignup = () => {
-    setIsAuthenticated(true);
-    setHasOnboarded(false); // New user needs onboarding
     setCurrentView("onboarding");
   };
 
   const handleOnboardingComplete = () => {
-    setHasOnboarded(true);
     setCurrentView("dashboard");
   };
 
-  if (!isAuthenticated) {
+  const handleOpenBuilder = (grantId: string) => {
+    setBuilderGrantId(grantId);
+    setCurrentView("builder");
+  };
+
+  const handleApplyFromMap = (grantId: string) => {
+    ctx.applyToGrant(grantId);
+    setCurrentView("applications");
+  };
+
+  if (!ctx.isAuthenticated) {
     return <Login onLogin={handleLogin} onSignup={handleSignup} />;
   }
 
-  if (!hasOnboarded && currentView === "onboarding") {
+  if (!ctx.hasOnboarded && currentView === "onboarding") {
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
@@ -64,26 +74,25 @@ export default function App() {
 
         {/* Middle Section: Canvas/View + Right Panel */}
         <div className="flex flex-1 min-h-0 relative">
-          
+
           {/* Central View Switcher */}
           {currentView === "dashboard" ? (
             <div className="flex-1 relative bg-zinc-950 flex flex-col">
-               <div className="flex-1 relative">
-                  <ReactFlowProvider>
-                    <MindMap onSelectionChange={setIsGrantSelected} />
-                  </ReactFlowProvider>
-                  
-                  {/* Floating Widget */}
-                  <div className="absolute top-4 left-4 z-10">
-                    <ActiveMonitoringWidget />
-                  </div>
-               </div>
-               {/* Timeline removed as per user request */}
+              <div className="flex-1 relative">
+                <ReactFlowProvider>
+                  <MindMap onSelectionChange={setIsGrantSelected} onApplyGrant={handleApplyFromMap} />
+                </ReactFlowProvider>
+
+                {/* Floating Widget */}
+                <div className="absolute top-4 left-4 z-10">
+                  <ActiveMonitoringWidget />
+                </div>
+              </div>
             </div>
           ) : currentView === "applications" ? (
-            <MyApplications onOpenBuilder={() => setCurrentView("builder")} />
-          ) : currentView === "builder" ? (
-            <ApplicationBuilder onBack={() => setCurrentView("applications")} />
+            <MyApplications onOpenBuilder={handleOpenBuilder} />
+          ) : currentView === "builder" && builderGrantId ? (
+            <ApplicationBuilder grantId={builderGrantId} onBack={() => setCurrentView("applications")} />
           ) : currentView === "onboarding" ? (
             <Onboarding onComplete={handleOnboardingComplete} />
           ) : currentView === "reports" ? (
@@ -105,3 +114,10 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <AppProvider>
+      <AppInner />
+    </AppProvider>
+  );
+}

@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -16,36 +15,33 @@ import "@xyflow/react/dist/style.css";
 import { GrantNode } from "./GrantNode";
 import { GrantDetailsPanel } from "./GrantDetailsPanel";
 import { AnimatePresence } from "motion/react";
+import { useAppContext } from "@/AppContext";
 
 const nodeTypes = {
   grant: GrantNode,
 };
 
-const MOCK_GRANTS = [
-  { id: "g1", title: "EU Horizon Climate Innovation Fund 2026", amount: "€75,000", deadline: "3 months", portal: "EU Horizon", matchScore: 98 },
-  { id: "g2", title: "Green Energy Transition Grant", amount: "$50,000", deadline: "2 months", portal: "Grants.gov", matchScore: 95 },
-  { id: "g3", title: "Youth for Planet Action Fund", amount: "$60,000", deadline: "4 months", portal: "UN", matchScore: 92 },
-  { id: "g4", title: "Sustainable Communities Initiative", amount: "$100,000", deadline: "6 months", portal: "Ford Foundation", matchScore: 89 },
-  { id: "g5", title: "Clean Water Access Project", amount: "$45,000", deadline: "1 month", portal: "EcoFund", matchScore: 85 },
-  { id: "g6", title: "Renewable Tech Accelerator", amount: "$120,000", deadline: "5 months", portal: "Grants.gov", matchScore: 82 },
-  { id: "g7", title: "Urban Forestry Grant", amount: "$30,000", deadline: "2 weeks", portal: "EcoFund", matchScore: 80 },
-  { id: "g8", title: "Ocean Cleanup Innovation", amount: "$200,000", deadline: "8 months", portal: "EU Horizon", matchScore: 78 },
-  { id: "g9", title: "Solar Schools Initiative", amount: "$80,000", deadline: "3 months", portal: "Ford Foundation", matchScore: 75 },
-  { id: "g10", title: "Biodiversity Research Fund", amount: "$55,000", deadline: "4 months", portal: "UN", matchScore: 72 },
-  { id: "g11", title: "Climate Justice Advocacy", amount: "$40,000", deadline: "6 weeks", portal: "Grants.gov", matchScore: 70 },
-  { id: "g12", title: "Zero Waste Community Challenge", amount: "$25,000", deadline: "1 month", portal: "EcoFund", matchScore: 68 },
-];
-
 interface MindMapProps {
   onSelectionChange?: (isSelected: boolean) => void;
+  onApplyGrant?: (grantId: string) => void;
 }
 
-export function MindMap({ onSelectionChange }: MindMapProps) {
+export function MindMap({ onSelectionChange, onApplyGrant }: MindMapProps) {
+  const ctx = useAppContext();
+
+  // Memoize to avoid new array references on every render
+  const availableGrants = useMemo(
+    () => ctx.grants.filter(g => g.status === "available"),
+    [ctx.grants]
+  );
+
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedGrant, setSelectedGrant] = useState<any>(null);
   const [visibleGrantIds, setVisibleGrantIds] = useState<string[]>([]);
-  const [availableGrants, setAvailableGrants] = useState(MOCK_GRANTS);
+  const initializedRef = useRef(false);
+
+  const orgName = ctx.userProfile?.organizationName || "Your Org";
 
   useEffect(() => {
     onSelectionChange?.(!!selectedGrant);
@@ -56,7 +52,7 @@ export function MindMap({ onSelectionChange }: MindMapProps) {
     [setEdges]
   );
 
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     if (node.type === 'grant') {
       setSelectedGrant(node.data);
     } else {
@@ -64,33 +60,65 @@ export function MindMap({ onSelectionChange }: MindMapProps) {
     }
   }, []);
 
-  const handleApply = (grant: any) => {
-    // Remove the applied grant from the map
-    setAvailableGrants(prev => prev.filter(g => g.id !== grant.id));
-    setVisibleGrantIds(prev => prev.filter(id => id !== grant.id));
+  const handleApply = useCallback((grant: any) => {
     setSelectedGrant(null);
-    
-    // Add the next best grant if available
-    const nextGrant = availableGrants.find(g => !visibleGrantIds.includes(g.id) && g.id !== grant.id);
-    if (nextGrant) {
-       setVisibleGrantIds(prev => [...prev, nextGrant.id]);
+    if (onApplyGrant) {
+      onApplyGrant(grant.id);
     }
-  };
+  }, [onApplyGrant]);
 
-  // Initialize with top grant + 5 others
+  // Initialize visible grants only once
   useEffect(() => {
-    if (visibleGrantIds.length === 0 && availableGrants.length > 0) {
-      const initialIds = availableGrants.slice(0, 6).map(g => g.id);
-      setVisibleGrantIds(initialIds);
+    if (!initializedRef.current && availableGrants.length > 0) {
+      initializedRef.current = true;
+      const sorted = [...availableGrants].sort((a, b) => b.matchScore - a.matchScore);
+      setVisibleGrantIds(sorted.slice(0, 6).map(g => g.id));
     }
-  }, [availableGrants, visibleGrantIds]);
+  }, [availableGrants]);
+
+  // When a grant is removed (applied), refresh visible IDs
+  const prevAvailableIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const currentIds = availableGrants.map(g => g.id);
+    const prevIds = prevAvailableIdsRef.current;
+    prevAvailableIdsRef.current = currentIds;
+
+    // Skip on first render
+    if (prevIds.length === 0) return;
+
+    // Check if any currently visible grants were removed
+    const currentIdSet = new Set(currentIds);
+    const removedFromVisible = visibleGrantIds.filter(id => !currentIdSet.has(id));
+
+    if (removedFromVisible.length > 0) {
+      const remaining = availableGrants
+        .filter(g => !visibleGrantIds.includes(g.id) || removedFromVisible.includes(g.id))
+        .filter(g => currentIdSet.has(g.id))
+        .sort((a, b) => b.matchScore - a.matchScore);
+
+      const newVisible = visibleGrantIds.filter(id => currentIdSet.has(id));
+      const toAdd = remaining
+        .filter(g => !newVisible.includes(g.id))
+        .slice(0, 6 - newVisible.length);
+
+      setVisibleGrantIds([...newVisible, ...toAdd.map(g => g.id)]);
+    }
+  }, [availableGrants]); // Safe because availableGrants is memoized
+
+  // Helper for edge colors
+  const getEdgeColor = useCallback((score: number) => {
+    if (score >= 90) return "#10b981";
+    if (score >= 80) return "#4ade80";
+    if (score >= 70) return "#86efac";
+    if (score >= 60) return "#facc15";
+    return "#ef4444";
+  }, []);
 
   // Update nodes layout when visible grants change
   useEffect(() => {
     if (visibleGrantIds.length === 0) return;
 
     const currentGrants = availableGrants.filter(g => visibleGrantIds.includes(g.id));
-    // Sort by match score to find the best one
     const sortedGrants = [...currentGrants].sort((a, b) => b.matchScore - a.matchScore);
     const topGrant = sortedGrants[0];
     const otherGrants = sortedGrants.slice(1);
@@ -98,11 +126,11 @@ export function MindMap({ onSelectionChange }: MindMapProps) {
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
 
-    // Root Node (User Query)
-    const rootNode = {
+    // Root Node
+    newNodes.push({
       id: "root",
       type: "input",
-      data: { label: "EcoYouth Query" },
+      data: { label: `${orgName} Query` },
       position: { x: 0, y: 0 },
       style: {
         background: "#10b981",
@@ -114,28 +142,18 @@ export function MindMap({ onSelectionChange }: MindMapProps) {
         fontWeight: "bold",
         boxShadow: "0 0 20px rgba(16, 185, 129, 0.4)",
       },
-    };
-    newNodes.push(rootNode);
+    });
 
-    // Helper for edge colors
-    const getEdgeColor = (score: number) => {
-      if (score >= 90) return "#10b981"; // Bright Green (Emerald-500)
-      if (score >= 80) return "#4ade80"; // Light Green (Green-400)
-      if (score >= 70) return "#86efac"; // Very Mild Green (Green-300)
-      if (score >= 60) return "#facc15"; // Yellow (Yellow-400)
-      return "#ef4444"; // Red (Red-500)
-    };
-
-    // Top Grant (Center-ish, slightly offset)
+    // Top Grant
     if (topGrant) {
-       const topColor = getEdgeColor(topGrant.matchScore);
-       newNodes.push({
-         id: topGrant.id,
-         type: "grant",
-         position: { x: 0, y: 250 }, // Directly below root
-         data: { ...topGrant },
-       });
-       newEdges.push({
+      const topColor = getEdgeColor(topGrant.matchScore);
+      newNodes.push({
+        id: topGrant.id,
+        type: "grant",
+        position: { x: 0, y: 250 },
+        data: { ...topGrant },
+      });
+      newEdges.push({
         id: `e-root-${topGrant.id}`,
         source: "root",
         target: topGrant.id,
@@ -145,16 +163,17 @@ export function MindMap({ onSelectionChange }: MindMapProps) {
         labelStyle: { fill: topColor, fontWeight: 700, fontSize: 12 },
         labelBgStyle: { fill: "#09090b", fillOpacity: 0.8 },
         markerEnd: { type: MarkerType.ArrowClosed, color: topColor },
-       });
+      });
     }
 
-    // Other Grants (Circular Layout around Top Grant)
+    // Other Grants (Circular Layout)
     const radius = 450;
     const centerX = 0;
     const centerY = 250;
-    
+
     otherGrants.forEach((grant, index) => {
-      const angle = (2 * Math.PI / otherGrants.length) * index - Math.PI / 2;
+      const count = otherGrants.length;
+      const angle = (2 * Math.PI / count) * index - Math.PI / 2;
       const x = centerX + Math.cos(angle) * radius;
       const y = centerY + Math.sin(angle) * radius;
       const edgeColor = getEdgeColor(grant.matchScore);
@@ -171,15 +190,14 @@ export function MindMap({ onSelectionChange }: MindMapProps) {
         source: "root",
         target: grant.id,
         animated: true,
-        style: { stroke: edgeColor, strokeWidth: 2 }, // Increased width slightly for visibility
+        style: { stroke: edgeColor, strokeWidth: 2 },
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
       });
     });
 
     setNodes(newNodes);
     setEdges(newEdges);
-
-  }, [visibleGrantIds, availableGrants, setNodes, setEdges]);
+  }, [visibleGrantIds, availableGrants, setNodes, setEdges, orgName, getEdgeColor]);
 
   return (
     <div className="w-full h-full bg-zinc-950 relative">
@@ -200,26 +218,22 @@ export function MindMap({ onSelectionChange }: MindMapProps) {
         <Background color="#3f3f46" gap={20} size={1} />
         <Controls className="bg-zinc-800 border border-white/10 fill-white text-white" />
       </ReactFlow>
-      
-      {/* Loading Indicator Overlay */}
+
+      {/* Status Indicator */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-zinc-900/80 backdrop-blur border border-white/10 px-4 py-2 rounded-full flex items-center gap-3 text-xs text-zinc-400 pointer-events-none">
         <div className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </div>
-        <span>
-          {visibleGrantIds.length < availableGrants.length 
-            ? `Agent #${Math.floor(Math.random() * 10) + 1} discovering...` 
-            : "Discovery Complete"}
-        </span>
+        <span>{availableGrants.length} grants discovered</span>
       </div>
 
       {/* Grant Details Panel */}
       <AnimatePresence>
         {selectedGrant && (
-          <GrantDetailsPanel 
-            grant={selectedGrant} 
-            onClose={() => setSelectedGrant(null)} 
+          <GrantDetailsPanel
+            grant={selectedGrant}
+            onClose={() => setSelectedGrant(null)}
             onApply={handleApply}
           />
         )}
