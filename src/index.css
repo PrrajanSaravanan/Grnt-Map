@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --animate-tilt: tilt 10s infinite linear;
+
+  @keyframes tilt {
+    0%, 50%, 100% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(0.5deg);
+    }
+    75% {
+      transform: rotate(-0.5deg);
+    }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-zinc-950 text-zinc-50 antialiased;
+  }
+}
+
+/* React Flow Customization */
+.react-flow__node {
+  @apply border-none shadow-none bg-transparent;
+}
+
+.react-flow__handle {
+  @apply w-3 h-3 rounded-full border-2 border-zinc-900 transition-colors;
+}
+
+.react-flow__edge-path {
+  @apply stroke-emerald-500/50 stroke-2;
+}
+
+.react-flow__controls {
+  @apply bg-zinc-800 border border-white/10 rounded-lg overflow-hidden shadow-xl;
+}
+
+.react-flow__controls-button {
+  @apply border-b border-white/10 bg-zinc-800 fill-zinc-400 hover:bg-zinc-700 hover:fill-white transition-colors;
+}
+
+.react-flow__controls-button:last-child {
+  @apply border-b-0;
+}
+
+.react-flow__minimap {
+  @apply rounded-lg overflow-hidden shadow-xl border border-white/10 bg-zinc-900;
+}
