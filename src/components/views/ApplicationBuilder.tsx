@@ -128,17 +128,28 @@ export function ApplicationBuilder({ grantId, onBack }: ApplicationBuilderProps)
           {/* Form Content */}
           <div className="col-span-9 space-y-8">
             {/* AI Banner */}
-            <div className="bg-gradient-to-r from-emerald-900/20 to-cyan-900/20 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-3">
-              <Sparkles className="text-emerald-400 shrink-0 mt-0.5" size={18} />
-              <div>
-                <h3 className="text-sm font-medium text-emerald-400 mb-1">AI Pre-fill Active</h3>
-                <p className="text-xs text-zinc-300">
-                  We've pre-filled sections using your organization profile. Review and edit below, then mark each section complete.
-                </p>
+            <div className="bg-gradient-to-r from-emerald-900/20 to-cyan-900/20 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-4">
+              <div className="flex-1 flex gap-3">
+                <Sparkles className="text-emerald-400 shrink-0 mt-0.5" size={18} />
+                <div>
+                  <h3 className="text-sm font-medium text-emerald-400 mb-1">AI Pre-fill Active</h3>
+                  <p className="text-xs text-zinc-300">
+                    We've pre-filled sections using your organization profile. Review and edit below, or use TinyFish to research this specific grant in depth.
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => ctx.researchDraft(grantId)}
+                disabled={submitted}
+                className="shrink-0 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-2"
+              >
+                <Sparkles size={14} />
+                Research with TinyFish
+              </button>
             </div>
 
             {/* Form Sections */}
+
             <div className="space-y-6">
               <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">

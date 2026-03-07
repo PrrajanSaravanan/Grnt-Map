@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useAppContext } from "@/AppContext";
 import { Terminal, Cpu, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -25,32 +26,13 @@ const MESSAGES = [
 ];
 
 export function ActivityFeed() {
-  const [logs, setLogs] = useState<Log[]>([]);
+  const ctx = useAppContext();
+  const logs = ctx.discoveryLogs;
+  const isProcessing = ctx.isDiscovering;
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Initial logs
-    setLogs([
-      { id: "1", agent: "Agent 3", message: "Paginating Grants.gov...", type: "info", timestamp: Date.now() },
-      { id: "2", agent: "Agent 9", message: "Eligibility match: 92% fit ✓", type: "success", timestamp: Date.now() },
-      { id: "3", agent: "EvoForge", message: "Mutation recovered – layout change handled", type: "warning", timestamp: Date.now() },
-    ]);
+  // Auto-scroll logic could go here if needed
 
-    const interval = setInterval(() => {
-      const randomMsg = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
-      const newLog: Log = {
-        id: Math.random().toString(36).substring(7),
-        agent: AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)],
-        message: randomMsg.msg,
-        type: randomMsg.type as "info" | "success" | "warning",
-        timestamp: Date.now(),
-      };
-
-      setLogs((prev) => [newLog, ...prev].slice(0, 20));
-    }, 1200);
-
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div className="w-80 bg-zinc-900 border-l border-white/10 flex flex-col h-full shrink-0 z-20">
@@ -110,9 +92,9 @@ export function ActivityFeed() {
                 <div>
                   <span className="text-zinc-500">[{log.agent}]</span>{" "}
                   <span className={
-                    log.type === "success" ? "text-emerald-400" : 
-                    log.type === "warning" ? "text-amber-400" : 
-                    "text-zinc-300"
+                    log.type === "success" ? "text-emerald-400" :
+                      log.type === "warning" ? "text-amber-400" :
+                        "text-zinc-300"
                   }>
                     {log.message}
                   </span>
@@ -121,15 +103,24 @@ export function ActivityFeed() {
             ))}
           </AnimatePresence>
         </div>
-        
+
         {/* Fade overlay at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-zinc-900 to-transparent pointer-events-none" />
       </div>
 
       <div className="p-3 border-t border-white/10 bg-zinc-900/50">
         <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <Loader2 size={12} className="animate-spin" />
-          <span>Processing stream...</span>
+          {isProcessing ? (
+            <>
+              <Loader2 size={12} className="animate-spin text-emerald-500" />
+              <span className="text-emerald-400">TinyFish Agent running...</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 size={12} />
+              <span>Agents dormant. Ready for discovery.</span>
+            </>
+          )}
         </div>
       </div>
     </div>
