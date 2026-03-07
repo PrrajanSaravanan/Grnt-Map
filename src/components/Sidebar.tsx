@@ -1,57 +1,80 @@
-import { User, Search, Settings, FileText, BarChart3 } from "lucide-react";
+import { User, Search, Settings, FileText, BarChart3, Users, Zap, LayoutDashboard, History, Briefcase, PenTool } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+interface SidebarProps {
+  currentView: string;
+  onNavigate: (view: string) => void;
+}
+
+export function Sidebar({ currentView, onNavigate }: SidebarProps) {
+  const navItems = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "applications", label: "My Applications", icon: PenTool },
+    { id: "reports", label: "Reports", icon: BarChart3 },
+    { id: "collab", label: "Team Collab", icon: Users },
+    { id: "settings", label: "Settings", icon: Settings },
+  ];
+
   return (
-    <div className="w-64 bg-zinc-900 border-r border-white/10 flex flex-col h-full text-zinc-300">
+    <div className="w-64 bg-zinc-900 border-r border-white/10 flex flex-col h-full text-zinc-300 shrink-0 z-20">
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/30">
+          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/30 relative">
             <User size={20} />
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-zinc-900 rounded-full flex items-center justify-center">
+              <div className="w-2.5 h-2.5 bg-blue-500 rounded-full border border-zinc-900" title="Verified" />
+            </div>
           </div>
           <div>
             <h3 className="font-semibold text-white text-sm">EcoYouth Nonprofit</h3>
-            <p className="text-xs text-zinc-500">Pro Plan</p>
+            <p className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">Verified • Pro</p>
           </div>
         </div>
       </div>
 
       <div className="p-4 space-y-6 flex-1 overflow-y-auto">
+        <nav className="space-y-1">
+          <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 px-2">Menu</h4>
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                currentView === item.id
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <item.icon size={18} className={cn(currentView === item.id ? "text-emerald-400" : "text-zinc-500 group-hover:text-white")} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
         <div>
-          <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3 px-2">Current Mission</h4>
-          <div className="bg-zinc-800/50 rounded-lg p-3 border border-white/5 text-sm">
-            <div className="flex items-start gap-2 text-zinc-400 mb-2">
-              <Search size={14} className="mt-0.5 shrink-0" />
-              <span className="italic">“Find $50k+ climate grants for my US nonprofit with 3-month deadline”</span>
+          <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3 px-2">Saved Profile</h4>
+          <div className="bg-zinc-950/50 rounded-lg p-3 border border-white/5 text-xs space-y-3">
+            <div>
+              <div className="text-zinc-500 mb-1">Focus Areas</div>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/5">Climate</span>
+                <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/5">Education</span>
+              </div>
             </div>
-            <div className="flex gap-2 mt-3">
-              <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs border border-emerald-500/20">Climate</span>
-              <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-400 text-xs border border-blue-500/20">$50k+</span>
+            <div>
+              <div className="text-zinc-500 mb-1">Budget Range</div>
+              <div className="text-zinc-300 font-mono">$50k – $150k</div>
+            </div>
+            <div>
+              <div className="text-zinc-500 mb-1">Location</div>
+              <div className="text-zinc-300">United States</div>
             </div>
           </div>
         </div>
-
-        <nav className="space-y-1">
-          <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 px-2">Navigation</h4>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5 text-white font-medium">
-            <Search size={18} />
-            Discovery
-          </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
-            <FileText size={18} />
-            Applications
-          </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
-            <BarChart3 size={18} />
-            Analytics
-          </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
-            <Settings size={18} />
-            Settings
-          </button>
-        </nav>
       </div>
       
-      <div className="p-4 border-t border-white/10 text-xs text-zinc-600 text-center">
+      <div className="p-4 border-t border-white/10 text-[10px] text-zinc-600 text-center font-mono">
         v2.4.0 • Stable Build
       </div>
     </div>

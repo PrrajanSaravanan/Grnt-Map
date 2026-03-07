@@ -3,15 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import { DollarSign, Calendar, ExternalLink, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
 
-const PORTAL_ICONS = {
-  "Grants.gov": "🏛️",
-  "EU Horizon": "🇪🇺",
-  "Ford Foundation": "🚙",
-  "UN": "🇺🇳",
-  "EcoFund": "🌱",
-};
-
-export const GrantNode = memo(({ data }: any) => {
+export const GrantNode = memo(({ data, selected }: any) => {
   return (
     <motion.div
       initial={{ scale: 0, opacity: 0 }}
@@ -19,12 +11,14 @@ export const GrantNode = memo(({ data }: any) => {
       transition={{ type: "spring", stiffness: 260, damping: 20 }}
       className="relative group"
     >
-      <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl blur opacity-30 group-hover:opacity-75 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
-      <div className="relative w-72 bg-zinc-900 border border-white/10 rounded-xl p-4 shadow-xl backdrop-blur-xl">
+      {selected && (
+        <div className="absolute -inset-1 bg-emerald-500/50 rounded-xl blur-md animate-pulse"></div>
+      )}
+      <div className={`relative w-72 bg-zinc-900 border ${selected ? "border-emerald-500" : "border-white/10"} rounded-xl p-4 shadow-xl backdrop-blur-xl transition-colors duration-300`}>
         {/* Header */}
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-xl">{PORTAL_ICONS[data.portal] || "📄"}</span>
+            <span className="text-xl">{data.portal === "EU Horizon" ? "🇪🇺" : data.portal === "Grants.gov" ? "🏛️" : data.portal === "UN" ? "🇺🇳" : "🌱"}</span>
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{data.portal}</span>
           </div>
           <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
