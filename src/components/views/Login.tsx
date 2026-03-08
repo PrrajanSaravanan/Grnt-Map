@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Zap, ArrowRight, Mail, Lock, Building2, Globe, User } from "lucide-react";
 import { motion } from "motion/react";
 import { useAppContext } from "@/AppContext";

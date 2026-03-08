@@ -32,8 +32,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     setFocusAreas(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
 
-  const handleFinish = () => {
-    ctx.completeOnboarding({
+  const handleFinish = async () => {
+    await ctx.completeOnboarding({
       missionStatement,
       focusAreas,
       grantSizeMin,
@@ -45,6 +45,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       previousGrantExperience,
       internationalEligible,
     });
+
+    // Auto-trigger the discovery stream when hitting the dashboard!
+    ctx.discoverGrants();
+
     onComplete();
   };
 
@@ -159,14 +163,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Min Grant Size</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                      <input type="text" value={grantSizeMin} onChange={e => setGrantSizeMin(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" />
+                      <input type="text" value={grantSizeMin} onChange={e => setGrantSizeMin(e.target.value)} onFocus={e => e.target.select()} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Max Grant Size</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                      <input type="text" value={grantSizeMax} onChange={e => setGrantSizeMax(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" />
+                      <input type="text" value={grantSizeMax} onChange={e => setGrantSizeMax(e.target.value)} onFocus={e => e.target.select()} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" />
                     </div>
                   </div>
                 </div>
@@ -215,7 +219,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Years Operating</label>
-                    <input type="number" value={yearsOperating} onChange={e => setYearsOperating(Number(e.target.value))} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" />
+                    <input type="number" value={yearsOperating} onChange={e => setYearsOperating(Number(e.target.value))} onFocus={e => e.target.select()} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" />
                   </div>
                 </div>
                 <div>
