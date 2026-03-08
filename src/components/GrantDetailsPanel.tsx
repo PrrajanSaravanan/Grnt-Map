@@ -1,40 +1,14 @@
 import { X, Check, AlertCircle, Sparkles, FileText, Mail, File, Database, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
-import { useAppContext } from "@/AppContext";
+import { Grant } from "@/types";
 
 interface GrantDetailsPanelProps {
-  grant: any;
+  grant: Grant;
   onClose: () => void;
-  onApply: (grant: any) => void;
+  onApply: (grant: Grant) => void;
 }
 
 export function GrantDetailsPanel({ grant, onClose, onApply }: GrantDetailsPanelProps) {
-  const ctx = useAppContext();
-  const profile = ctx.userProfile;
-
-  // Generate dynamic match reasons based on user profile
-  const matchReasons: string[] = [];
-  if (profile) {
-    if (profile.focusAreas.some(a => grant.title.toLowerCase().includes(a.toLowerCase().split(" ")[0]))) {
-      matchReasons.push(`${profile.focusAreas[0]} mission overlap detected in your organization profile`);
-    } else {
-      matchReasons.push("Strong mission alignment detected with your organization profile");
-    }
-    matchReasons.push(`Budget request range matches the grant's funding bracket ($${profile.grantSizeMin} - $${profile.grantSizeMax})`);
-    if (profile.country) {
-      matchReasons.push(`${profile.country}-based ${profile.orgType.toLowerCase()} eligibility confirmed`);
-    }
-    matchReasons.push(`Deadline within your requested ${profile.timeline.toLowerCase()} window`);
-  } else {
-    matchReasons.push("Strong mission alignment detected");
-    matchReasons.push("Budget range matches your profile");
-    matchReasons.push("Eligibility confirmed");
-    matchReasons.push("Deadline within your window");
-  }
-
-  // Derive success probability from match score
-  const successProb = Math.max(45, Math.min(92, grant.matchScore - Math.floor(Math.random() * 15 + 5)));
-
   return (
     <motion.div
       initial={{ x: "100%" }}
@@ -63,14 +37,6 @@ export function GrantDetailsPanel({ grant, onClose, onApply }: GrantDetailsPanel
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
-        {/* Description */}
-        {grant.description && (
-          <section>
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">About This Grant</h3>
-            <p className="text-sm text-zinc-300 leading-relaxed">{grant.description}</p>
-          </section>
-        )}
-
         {/* Match Explanation */}
         <section>
           <div className="flex items-center justify-between mb-4">
@@ -83,12 +49,18 @@ export function GrantDetailsPanel({ grant, onClose, onApply }: GrantDetailsPanel
             </div>
           </div>
           <ul className="space-y-3">
-            {matchReasons.map((reason, i) => (
-              <li key={i} className="flex gap-3 text-sm text-zinc-300">
-                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                {reason}
-              </li>
-            ))}
+            <li className="flex gap-3 text-sm text-zinc-300">
+              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              {grant.matchReason || "Strong alignment with your organization's mission and focus areas."}
+            </li>
+            <li className="flex gap-3 text-sm text-zinc-300">
+              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              Budget request range matches the grant’s funding bracket
+            </li>
+            <li className="flex gap-3 text-sm text-zinc-300">
+              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              Deadline within your requested window
+            </li>
           </ul>
         </section>
 
@@ -96,12 +68,31 @@ export function GrantDetailsPanel({ grant, onClose, onApply }: GrantDetailsPanel
         <section className="bg-zinc-950/50 rounded-xl p-5 border border-white/5">
           <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Eligibility Verification</h3>
           <div className="space-y-3">
-            {(grant.eligibility || []).map((rule: string, i: number) => (
-              <div key={i} className="flex justify-between items-center text-sm">
-                <span className="text-zinc-400">{rule}</span>
-                <Check size={14} className="text-emerald-500" />
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-zinc-400">Grant Type</span>
+              <span className="flex items-center gap-2 text-zinc-200">
+                {grant.type || "General"} <Check size={14} className="text-emerald-500" />
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-zinc-400">Location</span>
+              <span className="flex items-center gap-2 text-zinc-200">
+                {grant.location || "Global"} <Check size={14} className="text-emerald-500" />
+              </span>
+            </div>
+            
+            {/* Dynamic Requirements */}
+            {grant.requirements && grant.requirements.length > 0 && (
+              <div className="pt-3 mt-3 border-t border-white/5">
+                <div className="text-xs text-zinc-500 mb-2 uppercase tracking-wider">Key Requirements</div>
+                {grant.requirements.map((req, i) => (
+                  <div key={i} className="flex justify-between items-start text-sm mb-2 last:mb-0">
+                    <span className="text-zinc-300 flex-1 pr-4">{req}</span>
+                    <Check size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
           <div className="mt-4 pt-4 border-t border-white/5 text-[10px] text-zinc-600 text-center">
             Cross-portal eligibility analysis powered by autonomous agents.
@@ -113,24 +104,35 @@ export function GrantDetailsPanel({ grant, onClose, onApply }: GrantDetailsPanel
           <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">Success Probability</h3>
           <div className="bg-zinc-800/50 rounded-lg p-4 border border-white/5">
             <div className="flex items-end gap-2 mb-2">
-              <span className="text-3xl font-bold text-white">{successProb}%</span>
+              <span className="text-3xl font-bold text-white">{grant.probability || 72}%</span>
               <span className="text-xs text-zinc-500 mb-1.5">Estimated Probability</span>
             </div>
             <p className="text-sm text-zinc-400 leading-relaxed">
-              <span className="text-zinc-200 font-medium">Reasoning:</span> Strong mission alignment and appropriate funding scale{profile?.previousGrantExperience === "None" ? ", but no prior grant experience detected" : profile?.previousGrantExperience === "Experienced (4+)" ? " with substantial grant experience" : ", with some past grant experience in this sector"}.
+              <span className="text-zinc-200 font-medium">Reasoning:</span> {grant.probabilityReason || "Strong mission alignment and appropriate funding scale."}
             </p>
           </div>
         </section>
       </div>
 
       {/* Footer Action */}
-      <div className="p-6 border-t border-white/10 bg-zinc-900">
-        <button
+      <div className="p-6 border-t border-white/10 bg-zinc-900 space-y-3">
+        <button 
           onClick={() => onApply(grant)}
           className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold py-3 rounded-lg shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
         >
           Apply to Grant <ArrowRight size={18} />
         </button>
+        
+        {grant.url && (
+          <a 
+            href={grant.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium py-2 rounded-lg border border-white/5 transition-colors flex items-center justify-center gap-2 text-sm"
+          >
+            View Verified Source <ArrowRight size={14} />
+          </a>
+        )}
       </div>
     </motion.div>
   );

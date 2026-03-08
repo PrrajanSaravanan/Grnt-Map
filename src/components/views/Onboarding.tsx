@@ -1,55 +1,58 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Upload, Mic, Check, ArrowRight, Building2, Target, DollarSign, Globe2, Users, Zap } from "lucide-react";
-import { useAppContext } from "@/AppContext";
+
+import { Organization } from "@/types";
 
 interface OnboardingProps {
-  onComplete: () => void;
+  onComplete: (data: Partial<Organization>) => void;
 }
 
-const FOCUS_OPTIONS = ["Climate Action", "Youth Education", "Public Health", "Technology", "Arts & Culture", "Social Justice", "Community Dev", "Research"];
-
 export function Onboarding({ onComplete }: OnboardingProps) {
-  const ctx = useAppContext();
   const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({
+    mission: "To empower underrepresented youth through climate education and sustainable community projects in urban areas.",
+    focusAreas: ["Climate Action", "Youth Education", "Community Dev"],
+    minGrant: "50,000",
+    maxGrant: "150,000",
+    timeline: "Short Term (3-6 months)",
+    regions: ["United States"],
+    teamSize: "6-20 Employees",
+    yearsOperating: "4",
+    internationalEligible: true,
+    type: "Nonprofit"
+  });
 
-  // Form state
-  const [missionStatement, setMissionStatement] = useState(ctx.userProfile?.missionStatement || "");
-  const [focusAreas, setFocusAreas] = useState<string[]>(ctx.userProfile?.focusAreas || []);
-  const [grantSizeMin, setGrantSizeMin] = useState(ctx.userProfile?.grantSizeMin || "50,000");
-  const [grantSizeMax, setGrantSizeMax] = useState(ctx.userProfile?.grantSizeMax || "150,000");
-  const [timeline, setTimeline] = useState(ctx.userProfile?.timeline || "Short Term (3-6 months)");
-  const [regions, setRegions] = useState<string[]>(ctx.userProfile?.regions || ["United States"]);
-  const [teamSize, setTeamSize] = useState(ctx.userProfile?.teamSize || "6-20 Employees");
-  const [yearsOperating, setYearsOperating] = useState(ctx.userProfile?.yearsOperating || 4);
-  const [previousGrantExperience, setPreviousGrantExperience] = useState(ctx.userProfile?.previousGrantExperience || "Some (1-3 grants)");
-  const [internationalEligible, setInternationalEligible] = useState(ctx.userProfile?.internationalEligible ?? true);
-
-  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const toggleFocus = (tag: string) => {
-    setFocusAreas(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  const handleComplete = () => {
+    onComplete({
+      name: "My Organization", // Default name as it's not in the form yet
+      pastGrants: [], // Default empty
+      mission: formData.mission,
+      focusAreas: formData.focusAreas,
+      minGrant: formData.minGrant,
+      maxGrant: formData.maxGrant,
+      timeline: formData.timeline,
+      regions: formData.regions,
+      teamSize: formData.teamSize,
+      yearsOperating: formData.yearsOperating,
+      internationalEligible: formData.internationalEligible,
+      type: formData.type
+    });
   };
 
-  const handleFinish = async () => {
-    await ctx.completeOnboarding({
-      missionStatement,
-      focusAreas,
-      grantSizeMin,
-      grantSizeMax,
-      timeline,
-      regions,
-      teamSize,
-      yearsOperating,
-      previousGrantExperience,
-      internationalEligible,
+  const updateField = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleFocusArea = (area: string) => {
+    setFormData(prev => {
+      const current = prev.focusAreas;
+      if (current.includes(area)) {
+        return { ...prev, focusAreas: current.filter(a => a !== area) };
+      } else {
+        return { ...prev, focusAreas: [...current, area] };
+      }
     });
-
-    // Auto-trigger the discovery stream when hitting the dashboard!
-    ctx.discoverGrants();
-
-    onComplete();
   };
 
   const STEPS = [
@@ -74,10 +77,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           {STEPS.map((s) => (
             <div key={s.id} className="flex flex-col items-center gap-2 bg-zinc-950 px-2">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-colors ${step >= s.id
-                  ? "bg-emerald-500 text-zinc-950 border-emerald-500"
-                  : "bg-zinc-900 text-zinc-500 border-zinc-800"
-                  }`}
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-colors ${
+                  step >= s.id
+                    ? "bg-emerald-500 text-zinc-950 border-emerald-500"
+                    : "bg-zinc-900 text-zinc-500 border-zinc-800"
+                }`}
               >
                 <s.icon size={18} />
               </div>
@@ -95,42 +99,20 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <h3 className="text-xl font-semibold text-white">Organization Overview</h3>
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Mission Statement</label>
-                  <textarea
+                  <textarea 
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-white focus:border-emerald-500/50 focus:outline-none min-h-[120px]"
                     placeholder="Describe your organization's core mission and goals..."
-                    value={missionStatement}
-                    onChange={e => setMissionStatement(e.target.value)}
+                    value={formData.mission}
+                    onChange={(e) => updateField("mission", e.target.value)}
                   />
                 </div>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  className="hidden"
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) setUploadedFile(file.name);
-                  }}
-                />
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-emerald-500/50 hover:bg-zinc-950/50 transition-colors cursor-pointer group"
-                >
+                
+                <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-emerald-500/50 hover:bg-zinc-950/50 transition-colors cursor-pointer group">
                   <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                    <Upload className={`${uploadedFile ? "text-emerald-400" : "text-zinc-400"} group-hover:text-emerald-400`} size={20} />
+                    <Upload className="text-zinc-400 group-hover:text-emerald-400" size={20} />
                   </div>
-                  {uploadedFile ? (
-                    <>
-                      <p className="text-emerald-400 font-medium text-sm">{uploadedFile}</p>
-                      <p className="text-xs text-zinc-500 mt-1">Click to change file</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-white font-medium text-sm">Upload 501(c)(3) or Pitch Deck</p>
-                      <p className="text-xs text-zinc-500 mt-1">PDF up to 10MB (Optional)</p>
-                    </>
-                  )}
+                  <p className="text-white font-medium text-sm">Upload 501(c)(3) or Pitch Deck</p>
+                  <p className="text-xs text-zinc-500 mt-1">PDF up to 10MB (Optional)</p>
                 </div>
               </motion.div>
             )}
@@ -140,13 +122,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <h3 className="text-xl font-semibold text-white">Focus Areas</h3>
                 <p className="text-sm text-zinc-400">Select all that apply to your programs.</p>
                 <div className="grid grid-cols-2 gap-3">
-                  {FOCUS_OPTIONS.map((tag) => (
+                  {["Climate Action", "Youth Education", "Public Health", "Technology", "Arts & Culture", "Social Justice", "Community Dev", "Research"].map((tag) => (
                     <label key={tag} className="flex items-center gap-3 p-3 bg-zinc-950 border border-zinc-800 rounded-lg cursor-pointer hover:border-emerald-500/50 transition-colors">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 rounded border-zinc-700 text-emerald-500 focus:ring-emerald-500 bg-zinc-900"
-                        checked={focusAreas.includes(tag)}
-                        onChange={() => toggleFocus(tag)}
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-zinc-700 text-emerald-500 focus:ring-emerald-500 bg-zinc-900" 
+                        checked={formData.focusAreas.includes(tag)}
+                        onChange={() => toggleFocusArea(tag)}
                       />
                       <span className="text-sm text-zinc-200">{tag}</span>
                     </label>
@@ -163,20 +145,34 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Min Grant Size</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                      <input type="text" value={grantSizeMin} onChange={e => setGrantSizeMin(e.target.value)} onFocus={e => e.target.select()} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" />
+                      <input 
+                        type="text" 
+                        value={formData.minGrant}
+                        onChange={(e) => updateField("minGrant", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" 
+                      />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Max Grant Size</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                      <input type="text" value={grantSizeMax} onChange={e => setGrantSizeMax(e.target.value)} onFocus={e => e.target.select()} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" />
+                      <input 
+                        type="text" 
+                        value={formData.maxGrant}
+                        onChange={(e) => updateField("maxGrant", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-white" 
+                      />
                     </div>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Desired Timeline</label>
-                  <select className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" value={timeline} onChange={e => setTimeline(e.target.value)}>
+                  <select 
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" 
+                    value={formData.timeline}
+                    onChange={(e) => updateField("timeline", e.target.value)}
+                  >
                     <option>Immediate (1-2 months)</option>
                     <option>Short Term (3-6 months)</option>
                     <option>Long Term (6-12 months)</option>
@@ -185,18 +181,12 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Funding Regions</label>
                   <div className="flex flex-wrap gap-2">
-                    {regions.map(r => (
-                      <span key={r} className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-sm rounded-full border border-emerald-500/20 flex items-center gap-1">
-                        {r} <button onClick={() => setRegions(prev => prev.filter(x => x !== r))} className="hover:text-white">×</button>
+                    {formData.regions.map(region => (
+                      <span key={region} className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-sm rounded-full border border-emerald-500/20 flex items-center gap-1">
+                        {region} <button className="hover:text-white">×</button>
                       </span>
                     ))}
-                    <button
-                      onClick={() => {
-                        const region = prompt("Enter region name:");
-                        if (region && !regions.includes(region)) setRegions(prev => [...prev, region]);
-                      }}
-                      className="px-3 py-1 bg-zinc-800 text-zinc-400 text-sm rounded-full border border-zinc-700 hover:text-white hover:border-zinc-600"
-                    >
+                    <button className="px-3 py-1 bg-zinc-800 text-zinc-400 text-sm rounded-full border border-zinc-700 hover:text-white hover:border-zinc-600">
                       + Add Region
                     </button>
                   </div>
@@ -210,7 +200,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Team Size</label>
-                    <select className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" value={teamSize} onChange={e => setTeamSize(e.target.value)}>
+                    <select 
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" 
+                      value={formData.teamSize}
+                      onChange={(e) => updateField("teamSize", e.target.value)}
+                    >
                       <option>1-5 Employees</option>
                       <option>6-20 Employees</option>
                       <option>21-50 Employees</option>
@@ -219,24 +213,29 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Years Operating</label>
-                    <input type="number" value={yearsOperating} onChange={e => setYearsOperating(Number(e.target.value))} onFocus={e => e.target.select()} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" />
+                    <input 
+                      type="number" 
+                      value={formData.yearsOperating}
+                      onChange={(e) => updateField("yearsOperating", e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white" 
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Previous Grant Experience</label>
                   <div className="flex gap-4">
-                    {["None", "Some (1-3 grants)", "Experienced (4+)"].map(opt => (
-                      <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="exp"
-                          className="text-emerald-500 bg-zinc-950 border-zinc-700"
-                          checked={previousGrantExperience === opt}
-                          onChange={() => setPreviousGrantExperience(opt)}
-                        />
-                        <span className="text-zinc-300 text-sm">{opt}</span>
-                      </label>
-                    ))}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="exp" className="text-emerald-500 bg-zinc-950 border-zinc-700" />
+                      <span className="text-zinc-300 text-sm">None</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="exp" className="text-emerald-500 bg-zinc-950 border-zinc-700" defaultChecked />
+                      <span className="text-zinc-300 text-sm">Some (1-3 grants)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="exp" className="text-emerald-500 bg-zinc-950 border-zinc-700" />
+                      <span className="text-zinc-300 text-sm">Experienced (4+)</span>
+                    </label>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
@@ -245,11 +244,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     <div className="text-sm font-medium text-white">International Eligibility</div>
                     <div className="text-xs text-zinc-500">Are you eligible for international funding sources?</div>
                   </div>
-                  <input
-                    type="checkbox"
-                    className="ml-auto w-5 h-5 rounded border-zinc-700 text-emerald-500 bg-zinc-900"
-                    checked={internationalEligible}
-                    onChange={e => setInternationalEligible(e.target.checked)}
+                  <input 
+                    type="checkbox" 
+                    className="ml-auto w-5 h-5 rounded border-zinc-700 text-emerald-500 bg-zinc-900" 
+                    checked={formData.internationalEligible}
+                    onChange={(e) => updateField("internationalEligible", e.target.checked)}
                   />
                 </div>
               </motion.div>
@@ -262,7 +261,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   <div className="flex justify-between items-start pb-4 border-b border-white/5">
                     <div>
                       <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Mission</div>
-                      <div className="text-sm text-zinc-200 italic">"{missionStatement || "Not provided"}"</div>
+                      <div className="text-sm text-zinc-200 italic">"{formData.mission}"</div>
                     </div>
                     <button onClick={() => setStep(1)} className="text-xs text-emerald-400 hover:underline">Edit</button>
                   </div>
@@ -270,19 +269,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     <div>
                       <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Focus Areas</div>
                       <div className="flex flex-wrap gap-1">
-                        {focusAreas.length > 0 ? focusAreas.map(a => (
-                          <span key={a} className="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">{a}</span>
-                        )) : <span className="text-xs text-zinc-500">None selected</span>}
+                        {formData.focusAreas.map(area => (
+                          <span key={area} className="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">{area}</span>
+                        ))}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Funding</div>
-                      <div className="text-sm text-zinc-200 font-mono">${grantSizeMin} - ${grantSizeMax}</div>
+                      <div className="text-sm text-zinc-200 font-mono">${formData.minGrant}k - ${formData.maxGrant}k</div>
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Context</div>
-                    <div className="text-sm text-zinc-200">{teamSize} • {regions.join(", ")} • {internationalEligible ? "International Eligible" : "Domestic Only"}</div>
+                    <div className="text-sm text-zinc-200">
+                      {formData.teamSize} • {formData.regions.join(", ")} • {formData.internationalEligible ? "International Eligible" : "Domestic Only"}
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -300,7 +301,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             ) : (
               <div />
             )}
-
+            
             {step < 5 ? (
               <button
                 onClick={() => setStep(step + 1)}
@@ -310,7 +311,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               </button>
             ) : (
               <button
-                onClick={handleFinish}
+                onClick={handleComplete}
                 className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-8 py-2 rounded-lg font-bold shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 flex items-center gap-2"
               >
                 Start Grant Discovery <Zap size={18} />

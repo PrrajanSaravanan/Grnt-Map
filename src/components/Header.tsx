@@ -1,19 +1,18 @@
 import { Activity, Zap, Search, Bell } from "lucide-react";
-import { useAppContext } from "@/AppContext";
+import { Organization } from "@/types";
 
 interface HeaderProps {
   onNotificationClick?: () => void;
+  organization?: Organization;
 }
 
-export function Header({ onNotificationClick }: HeaderProps) {
-  const ctx = useAppContext();
-  const profile = ctx.userProfile;
-  const availableCount = ctx.grants.filter(g => g.status === "available").length;
+export function Header({ onNotificationClick, organization }: HeaderProps) {
+  const focusArea = organization?.focusAreas?.[0] || "climate";
+  const location = organization?.regions?.[0] || "US";
+  const minGrant = organization?.minGrant || "$50k";
+  const orgType = organization?.type || "nonprofit";
 
-  // Build a dynamic search query from user profile
-  const searchQuery = profile
-    ? `Find $${profile.grantSizeMin}+ ${profile.focusAreas[0]?.toLowerCase() || "climate"} grants for my ${profile.country || "US"} ${profile.orgType?.toLowerCase() || "nonprofit"}`
-    : "Find grants for my organization";
+  const searchQuery = `Find ${minGrant}+ ${focusArea.toLowerCase()} grants for my ${location} ${orgType} with 3-month deadline`;
 
   return (
     <header className="h-16 bg-zinc-900 border-b border-white/10 flex items-center justify-between px-6 z-10 relative shrink-0">
@@ -35,8 +34,8 @@ export function Header({ onNotificationClick }: HeaderProps) {
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 rounded-lg blur opacity-0 group-hover:opacity-100 transition duration-500" />
             <div className="relative bg-zinc-950 border border-white/10 rounded-lg px-4 py-2.5 flex items-center gap-3 shadow-inner">
               <Search size={16} className="text-zinc-500" />
-              <input
-                type="text"
+              <input 
+                type="text" 
                 readOnly
                 value={searchQuery}
                 className="bg-transparent border-none outline-none text-sm text-zinc-300 w-full font-medium placeholder:text-zinc-600 cursor-default"
@@ -54,23 +53,17 @@ export function Header({ onNotificationClick }: HeaderProps) {
         <div className="flex flex-col items-end">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
-              <span className={`absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 ${ctx.isDiscovering ? 'animate-ping' : ''}`}></span>
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 shadow-[0_0_10px_rgba(16,185,129,0.6)] ${ctx.isDiscovering ? 'bg-emerald-500' : 'bg-emerald-700'}`}></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]"></span>
             </span>
-            <span className="text-sm font-bold text-emerald-400 tabular-nums">{availableCount} Grants Available</span>
+            <span className="text-sm font-bold text-emerald-400 tabular-nums">14 Agents Running</span>
           </div>
-          <button
-            onClick={() => ctx.discoverGrants()}
-            disabled={ctx.isDiscovering}
-            className="text-[10px] text-emerald-500 hover:text-emerald-400 font-mono tabular-nums cursor-pointer transition-colors"
-          >
-            {ctx.isDiscovering ? "Discovering..." : "▶ Run Discovery"}
-          </button>
+          <span className="text-[10px] text-zinc-500 font-mono tabular-nums">2m 14s elapsed</span>
         </div>
-
+        
         <div className="h-8 w-px bg-white/10" />
 
-        <button
+        <button 
           onClick={onNotificationClick}
           className="relative text-zinc-400 hover:text-white transition-colors"
         >

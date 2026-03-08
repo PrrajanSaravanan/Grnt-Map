@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { Timeline } from "@/components/Timeline";
 import { MindMap } from "@/components/MindMap";
 import { Onboarding } from "@/components/views/Onboarding";
 import { Reports } from "@/components/views/Reports";
@@ -18,93 +19,154 @@ import { Login } from "@/components/views/Login";
 import { ReactFlowProvider } from "@xyflow/react";
 import { ActiveMonitoringWidget } from "@/components/ActiveMonitoringWidget";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
-import { AppProvider, useAppContext } from "@/AppContext";
+import { Grant, Application, Organization } from "@/types";
 
-function AppInner() {
-  const ctx = useAppContext();
-  const [currentView, setCurrentView] = useState(() => {
-    if (!ctx.isAuthenticated) return "login";
-    if (!ctx.hasOnboarded) return "onboarding";
-    return "dashboard";
-  });
+const DEFAULT_ORG: Organization = {
+  name: "EcoYouth Nonprofit",
+  mission: "To empower underrepresented youth through climate education and sustainable community projects in urban areas.",
+  pastGrants: ["Urban Garden Initiative 2024", "Youth Climate Leaders Fellowship"],
+  focusAreas: ["Climate", "Education"],
+  minGrant: "$50k",
+  maxGrant: "$150k",
+  regions: ["United States"],
+  type: "Nonprofit"
+};
+
+export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [currentView, setCurrentView] = useState("dashboard");
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isGrantSelected, setIsGrantSelected] = useState(false);
-  // Tracks which grant ID is being edited in the ApplicationBuilder
-  const [builderGrantId, setBuilderGrantId] = useState<string | null>(null);
+  const [selectedGrantForBuilder, setSelectedGrantForBuilder] = useState<Grant | null>(null);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [organizationProfile, setOrganizationProfile] = useState<Organization>(DEFAULT_ORG);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "collab") {
+      setIsAuthenticated(true);
+      setHasOnboarded(true);
+      setCurrentView("collab");
+    }
+  }, []);
 
   const handleLogin = () => {
+    setIsAuthenticated(true);
+    setHasOnboarded(true); // Assume existing user has onboarded
     setCurrentView("dashboard");
   };
 
   const handleSignup = () => {
+    setIsAuthenticated(true);
+    setHasOnboarded(false); // New user needs onboarding
     setCurrentView("onboarding");
   };
 
-  const handleOnboardingComplete = () => {
+  const handleOnboardingComplete = (data: Partial<Organization>) => {
+    setOrganizationProfile(prev => ({ ...prev, ...data }));
+    setHasOnboarded(true);
     setCurrentView("dashboard");
   };
 
-  const handleOpenBuilder = (grantId: string) => {
-    setBuilderGrantId(grantId);
+  const handleOpenBuilder = (grant: Grant) => {
+    setSelectedGrantForBuilder(grant);
     setCurrentView("builder");
   };
 
-  const handleApplyFromMap = (grantId: string) => {
-    ctx.applyToGrant(grantId);
-    setCurrentView("applications");
+  const handleApplyToGrant = (grant: Grant) => {
+    // Check if already exists
+    if (!myApplications.find(app => app.id === grant.id)) {
+      const newApplication: Application = {
+        ...grant,
+        status: "Started",
+        progress: 0
+      };
+      setMyApplications(prev => [newApplication, ...prev]);
+    }
+    // Open builder for this grant
+    handleOpenBuilder(grant);
   };
 
-  if (!ctx.isAuthenticated) {
+  const handleUpdateApplicationStatus = (grantId: string, status: string, progress: number) => {
+    setMyApplications(prev => prev.map(app => 
+      app.id === grantId ? { ...app, status, progress } : app
+    ));
+  };
+
+  if (!isAuthenticated) {
     return <Login onLogin={handleLogin} onSignup={handleSignup} />;
   }
 
-  if (!ctx.hasOnboarded && currentView === "onboarding") {
+  if (!hasOnboarded && currentView === "onboarding") {
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
   return (
     <div className="flex h-screen w-screen bg-zinc-950 text-white overflow-hidden font-sans selection:bg-emerald-500/30">
       {/* Left Sidebar */}
-      <Sidebar currentView={currentView} onNavigate={setCurrentView} />
+      <Sidebar 
+        currentView={currentView} 
+        onNavigate={setCurrentView} 
+        organization={organizationProfile}
+      />
 
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 min-w-0 relative">
         {/* Top Header */}
-        <Header onNotificationClick={() => setIsNotificationOpen(true)} />
+        <Header 
+          onNotificationClick={() => setIsNotificationOpen(true)} 
+          organization={organizationProfile}
+        />
 
         {/* Middle Section: Canvas/View + Right Panel */}
         <div className="flex flex-1 min-h-0 relative">
-
+          
           {/* Central View Switcher */}
           {currentView === "dashboard" ? (
             <div className="flex-1 relative bg-zinc-950 flex flex-col">
-              <div className="flex-1 relative" style={{ minHeight: "600px" }}>
-                <ReactFlowProvider>
-                  <MindMap onSelectionChange={setIsGrantSelected} onApplyGrant={handleApplyFromMap} />
-                </ReactFlowProvider>
-
-                {/* Floating Widget */}
-                <div className="absolute top-4 left-4 z-10">
-                  <ActiveMonitoringWidget />
-                </div>
-              </div>
+               <div className="flex-1 relative">
+                  <ReactFlowProvider>
+                    <MindMap 
+                      onSelectionChange={setIsGrantSelected} 
+                      onApply={handleApplyToGrant}
+                      organization={organizationProfile}
+                    />
+                  </ReactFlowProvider>
+                  
+                  {/* Floating Widget */}
+                  <div className="absolute top-4 left-4 z-10">
+                    <ActiveMonitoringWidget organization={organizationProfile} />
+                  </div>
+               </div>
+               {/* Timeline removed as per user request */}
             </div>
           ) : currentView === "applications" ? (
-            <MyApplications onOpenBuilder={handleOpenBuilder} />
-          ) : currentView === "builder" && builderGrantId ? (
-            <ApplicationBuilder grantId={builderGrantId} onBack={() => setCurrentView("applications")} />
+            <MyApplications 
+              applications={myApplications}
+              onOpenBuilder={handleOpenBuilder} 
+            />
+          ) : currentView === "builder" ? (
+            <ApplicationBuilder 
+              grant={selectedGrantForBuilder} 
+              onBack={() => setCurrentView("applications")} 
+              onUpdateStatus={handleUpdateApplicationStatus}
+              organization={organizationProfile}
+            />
           ) : currentView === "onboarding" ? (
             <Onboarding onComplete={handleOnboardingComplete} />
           ) : currentView === "reports" ? (
-            <Reports />
+            <Reports organization={organizationProfile} />
           ) : currentView === "collab" ? (
-            <TeamCollab />
+            <TeamCollab organization={organizationProfile} />
           ) : currentView === "settings" ? (
-            <Settings />
+            <Settings organization={organizationProfile} />
           ) : null}
 
           {/* Right Activity Feed - Always visible on Dashboard unless grant selected */}
-          {currentView === "dashboard" && !isGrantSelected && <ActivityFeed />}
+          {currentView === "dashboard" && !isGrantSelected && (
+            <ActivityFeed organization={organizationProfile} />
+          )}
         </div>
 
         {/* Notification Drawer Overlay */}
@@ -114,10 +176,3 @@ function AppInner() {
   );
 }
 
-export default function App() {
-  return (
-    <AppProvider>
-      <AppInner />
-    </AppProvider>
-  );
-}

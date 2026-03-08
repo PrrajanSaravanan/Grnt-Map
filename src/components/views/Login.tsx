@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Zap, ArrowRight, Mail, Lock, Building2, Globe, User } from "lucide-react";
 import { motion } from "motion/react";
-import { useAppContext } from "@/AppContext";
 
 interface LoginProps {
   onLogin: () => void;
@@ -9,22 +8,13 @@ interface LoginProps {
 }
 
 export function Login({ onLogin, onSignup }: LoginProps) {
-  const ctx = useAppContext();
   const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [orgName, setOrgName] = useState("");
-  const [orgType, setOrgType] = useState("Nonprofit");
-  const [country, setCountry] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSignUp) {
-      ctx.signup({ name, organizationName: orgName, email, orgType, country });
       onSignup();
     } else {
-      ctx.login(email);
       onLogin();
     }
   };
@@ -45,22 +35,24 @@ export function Login({ onLogin, onSignup }: LoginProps) {
           <p className="text-zinc-400">Autonomous Grant Swarm Intelligence</p>
         </div>
 
-        <motion.div
+        <motion.div 
           layout
           className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl"
         >
           <div className="flex gap-4 mb-8 p-1 bg-zinc-950/50 rounded-lg border border-white/5">
             <button
               onClick={() => setIsSignUp(false)}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${!isSignUp ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
-                }`}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                !isSignUp ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+              }`}
             >
               Sign In
             </button>
             <button
               onClick={() => setIsSignUp(true)}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${isSignUp ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
-                }`}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                isSignUp ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+              }`}
             >
               Sign Up
             </button>
@@ -73,20 +65,20 @@ export function Login({ onLogin, onSignup }: LoginProps) {
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Full Name</label>
                   <div className="relative">
                     <User className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="Jane Doe" required />
+                    <input type="text" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="Jane Doe" required />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Organization Name</label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                    <input type="text" value={orgName} onChange={e => setOrgName(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="EcoYouth Nonprofit" required />
+                    <input type="text" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="EcoYouth Nonprofit" required />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Type</label>
-                    <select value={orgType} onChange={e => setOrgType(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors text-sm">
+                    <select className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors text-sm">
                       <option>Nonprofit</option>
                       <option>Startup</option>
                       <option>Research</option>
@@ -96,7 +88,7 @@ export function Login({ onLogin, onSignup }: LoginProps) {
                     <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Country</label>
                     <div className="relative">
                       <Globe className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                      <input type="text" value={country} onChange={e => setCountry(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="USA" required />
+                      <input type="text" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="USA" required />
                     </div>
                   </div>
                 </div>
@@ -107,7 +99,7 @@ export function Login({ onLogin, onSignup }: LoginProps) {
               <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="name@org.com" required />
+                <input type="email" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="name@org.com" required />
               </div>
             </div>
 
@@ -115,7 +107,7 @@ export function Login({ onLogin, onSignup }: LoginProps) {
               <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="••••••••" required />
+                <input type="password" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none transition-colors" placeholder="••••••••" required />
               </div>
             </div>
 
@@ -125,7 +117,7 @@ export function Login({ onLogin, onSignup }: LoginProps) {
             </button>
           </form>
         </motion.div>
-
+        
         <p className="text-center text-zinc-500 text-xs mt-8">
           By continuing, you agree to our Terms of Service and Privacy Policy.
           <br />Protected by reCAPTCHA.

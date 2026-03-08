@@ -1,6 +1,18 @@
 import { Shield, Database, Key, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { Organization } from "@/types";
 
-export function Settings() {
+interface SettingsProps {
+  organization?: Organization;
+}
+
+export function Settings({ organization }: SettingsProps) {
+  // Generate a consistent "API Key" based on org name
+  const orgSlug = (organization?.name || "tinyfish").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const apiKey = `sk_live_${orgSlug}_${Math.floor(Math.random() * 1000000000)}`;
+  
+  const checkpointId = Math.floor(Math.random() * 1000) + 500;
+  const records = Math.floor(Math.random() * 100) + 20;
+
   return (
     <div className="flex-1 bg-zinc-950 p-8 overflow-y-auto">
       <div className="max-w-3xl mx-auto">
@@ -20,16 +32,16 @@ export function Settings() {
                 <div className="bg-zinc-950 rounded-lg p-4 border border-white/5 font-mono text-xs space-y-2">
                   <div className="flex justify-between text-zinc-500">
                     <span>Ledger Status</span>
-                    <span className="text-emerald-400">Synced • Updated 8s ago</span>
+                    <span className="text-emerald-400">Synced • Updated just now</span>
                   </div>
                   <div className="h-px bg-white/5 my-2" />
                   <div className="flex justify-between">
-                    <span className="text-zinc-300">Temporal Fabric Checkpoint #892</span>
-                    <span className="text-zinc-500">12.4 MB</span>
+                    <span className="text-zinc-300">Temporal Fabric Checkpoint #{checkpointId}</span>
+                    <span className="text-zinc-500">{(records * 0.3).toFixed(1)} MB</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-300">EvoForge Mutation History</span>
-                    <span className="text-zinc-500">42 Records</span>
+                    <span className="text-zinc-500">{records} Records</span>
                   </div>
                 </div>
 
@@ -42,7 +54,7 @@ export function Settings() {
                     </div>
                     <div className="flex gap-3 text-sm">
                       <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="text-zinc-300">New climate keywords discovered — Matching improved by 18%</span>
+                      <span className="text-zinc-300">New {organization?.focusAreas?.[0]?.toLowerCase() || "grant"} keywords discovered — Matching improved by 18%</span>
                     </div>
                     <div className="flex gap-3 text-sm">
                       <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -67,7 +79,7 @@ export function Settings() {
                 <div className="flex gap-2">
                   <input 
                     type="password" 
-                    value="sk_live_tinyfish_8923489238492" 
+                    value={apiKey}
                     readOnly 
                     className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400 font-mono"
                   />

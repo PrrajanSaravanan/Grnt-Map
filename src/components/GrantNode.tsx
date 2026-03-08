@@ -53,9 +53,23 @@ export const GrantNode = memo(({ data, selected }: any) => {
             <ShieldCheck size={10} className="text-emerald-500" />
             <span>Verified Source</span>
           </div>
-          <button className="text-[10px] flex items-center gap-1 text-cyan-400 hover:text-cyan-300 transition-colors">
-            View Details <ExternalLink size={10} />
-          </button>
+          <div className="flex items-center gap-2">
+            {data.url && (
+              <a 
+                href={data.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] flex items-center gap-1 text-zinc-400 hover:text-white transition-colors p-1 hover:bg-white/5 rounded"
+                onClick={(e) => e.stopPropagation()}
+                title="Open Official Grant Page"
+              >
+                <ExternalLink size={12} />
+              </a>
+            )}
+            <button className="text-[10px] flex items-center gap-1 text-cyan-400 hover:text-cyan-300 transition-colors">
+              View Details
+            </button>
+          </div>
         </div>
       </div>
 

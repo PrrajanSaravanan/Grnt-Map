@@ -1,21 +1,14 @@
-import { User, Search, Settings, FileText, BarChart3, Users, Zap, LayoutDashboard, History, Briefcase, PenTool, LogOut } from "lucide-react";
+import { User, Search, Settings, FileText, BarChart3, Users, Zap, LayoutDashboard, History, Briefcase, PenTool } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAppContext } from "@/AppContext";
+import { Organization } from "@/types";
 
 interface SidebarProps {
   currentView: string;
   onNavigate: (view: string) => void;
+  organization?: Organization;
 }
 
-export function Sidebar({ currentView, onNavigate }: SidebarProps) {
-  const ctx = useAppContext();
-  const profile = ctx.userProfile;
-  const orgName = profile?.organizationName || "My Organization";
-  const focusAreas = profile?.focusAreas || [];
-  const grantMin = profile?.grantSizeMin || "50,000";
-  const grantMax = profile?.grantSizeMax || "150,000";
-  const country = profile?.country || "United States";
-
+export function Sidebar({ currentView, onNavigate, organization }: SidebarProps) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "applications", label: "My Applications", icon: PenTool },
@@ -23,6 +16,11 @@ export function Sidebar({ currentView, onNavigate }: SidebarProps) {
     { id: "collab", label: "Team Collab", icon: Users },
     { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  const focusAreas = organization?.focusAreas || ["Climate", "Education"];
+  const minGrant = organization?.minGrant || "$50k";
+  const maxGrant = organization?.maxGrant || "$150k";
+  const regions = organization?.regions || ["United States"];
 
   return (
     <div className="w-64 bg-zinc-900 border-r border-white/10 flex flex-col h-full text-zinc-300 shrink-0 z-20">
@@ -35,7 +33,7 @@ export function Sidebar({ currentView, onNavigate }: SidebarProps) {
             </div>
           </div>
           <div>
-            <h3 className="font-semibold text-white text-sm">{orgName}</h3>
+            <h3 className="font-semibold text-white text-sm">{organization?.name || "EcoYouth Nonprofit"}</h3>
             <p className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">Verified • Pro</p>
           </div>
         </div>
@@ -67,35 +65,25 @@ export function Sidebar({ currentView, onNavigate }: SidebarProps) {
             <div>
               <div className="text-zinc-500 mb-1">Focus Areas</div>
               <div className="flex flex-wrap gap-1.5">
-                {focusAreas.length > 0 ? focusAreas.slice(0, 3).map(a => (
-                  <span key={a} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/5">{a}</span>
-                )) : (
-                  <span className="text-zinc-600">Not set</span>
-                )}
+                {focusAreas.map((area, i) => (
+                  <span key={i} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/5">{area}</span>
+                ))}
               </div>
             </div>
             <div>
               <div className="text-zinc-500 mb-1">Budget Range</div>
-              <div className="text-zinc-300 font-mono">${grantMin} – ${grantMax}</div>
+              <div className="text-zinc-300 font-mono">{minGrant} – {maxGrant}</div>
             </div>
             <div>
               <div className="text-zinc-500 mb-1">Location</div>
-              <div className="text-zinc-300">{country}</div>
+              <div className="text-zinc-300">{regions.join(", ")}</div>
             </div>
           </div>
         </div>
       </div>
-
-      <div className="p-4 border-t border-white/10 space-y-2">
-        <button
-          onClick={() => ctx.logout()}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-500 hover:text-red-400 hover:bg-red-500/5 rounded-lg transition-colors"
-        >
-          <LogOut size={16} /> Sign Out
-        </button>
-        <div className="text-[10px] text-zinc-600 text-center font-mono">
-          v2.4.0 • Stable Build
-        </div>
+      
+      <div className="p-4 border-t border-white/10 text-[10px] text-zinc-600 text-center font-mono">
+        v2.4.0 • Stable Build
       </div>
     </div>
   );
