@@ -115,49 +115,75 @@ Provide:
 Return as a JSON object with these fields.`;
 }
 
-/**
- * Stream a TinyFish automation run and yield SSE events.
- * Uses the /run-sse endpoint for real-time progress.
- */
 export async function* streamTinyFishRun(
     url: string,
     goal: string
 ): AsyncGenerator<TinyFishEvent> {
-    const apiKey = getApiKey();
+    console.log(`\n[TINYFISH] Starting real run for URL: ${url}`);
+    console.log(`[TINYFISH] Goal: ${goal.substring(0, 150)}...`);
 
-    const response = await fetch(`${TINYFISH_API_URL}/run-sse`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": apiKey,
-        },
-        body: JSON.stringify({
-            url,
-            goal,
-            browser_profile: "stealth",
-            proxy_config: { enabled: true, country_code: "US" },
-            feature_flags: { enable_agent_memory: true },
-        }),
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        yield { type: "ERROR", error: { message: `TinyFish API error: ${response.status} ${errText}` } };
-        return;
+    // 1) Start the Run
+    let runRes;
+    try {
+        console.log(`[TINYFISH DEBUG] Awaiting fetch(/run)...`);
+        runRes = await fetch(`${TINYFISH_API_URL}/run`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-API-Key": getApiKey(),
+            },
+            body: JSON.stringify({ url, goal }),
+        });
+        console.log(`[TINYFISH DEBUG] fetch(/run) returned: ${runRes.status}`);
+    } catch (e: any) {
+        console.error(`\n❌ [TINYFISH ERROR] Network failed connecting to API to start run:`, e);
+        throw new Error(`Failed to reach TinyFish API: ${e.message}`);
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
-        yield { type: "ERROR", error: { message: "No response body from TinyFish" } };
-        return;
+    if (!runRes.ok) {
+        const text = await runRes.text();
+        console.error(`\n❌ [TINYFISH ERROR] API returned status ${runRes.status} on start: ${text}`);
+        throw new Error(`TinyFish start failed (${runRes.status}): ${text}`);
     }
 
-    const decoder = new TextDecoder();
+    const { runId, streamingUrl } = await runRes.json();
+    console.log(`[TINYFISH] Run started successfully. ID: ${runId}`);
+
+    yield { type: "STARTED", runId };
+    yield { type: "STREAMING_URL", streamingUrl };
+
+    // 2) Listen to SSE flow
+    console.log(`[TINYFISH DEBUG] Connecting to SSE stream: ${streamingUrl}`);
+    let sseRes;
+    try {
+        console.log(`[TINYFISH DEBUG] Awaiting fetch(streamingUrl)...`);
+        sseRes = await fetch(streamingUrl, {
+            headers: { "X-API-Key": getApiKey() }
+        });
+        console.log(`[TINYFISH DEBUG] fetch(streamingUrl) returned: ${sseRes.status}`);
+    } catch (e: any) {
+        console.error(`\n❌ [TINYFISH ERROR] Network failed connecting to SSE stream:`, e);
+        throw new Error(`Failed to connect to SSE stream: ${e.message}`);
+    }
+
+    if (!sseRes.ok || !sseRes.body) {
+        const text = await sseRes.text();
+        console.error(`\n❌ [TINYFISH ERROR] SSE stream returned status ${sseRes.status}: ${text}`);
+        throw new Error(`Failed to stream from TinyFish (${sseRes.status}): ${text}`);
+    }
+
+    const reader = sseRes.body.getReader();
+    const decoder = new TextDecoder("utf-8");
     let buffer = "";
 
     while (true) {
+        console.log(`[TINYFISH DEBUG] Awaiting reader.read()...`);
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+            console.log(`[TINYFISH DEBUG] stream reader returns done=true`);
+            break;
+        }
+        console.log(`[TINYFISH DEBUG] Received chunk of length ${value?.length}`);
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -167,15 +193,42 @@ export async function* streamTinyFishRun(
             const trimmed = line.trim();
             if (!trimmed || !trimmed.startsWith("data: ")) continue;
 
-            try {
-                const data = JSON.parse(trimmed.slice(6));
-                yield data as TinyFishEvent;
+            const jsonStr = trimmed.slice(6);
+            if (jsonStr === "[DONE]") {
+                console.log(`[TINYFISH] Stream reached [DONE] marker.`);
+                return; // End of stream
+            }
 
-                if (data.type === "COMPLETE" || data.type === "ERROR") {
+            try {
+                const data = JSON.parse(jsonStr);
+
+                if (data.status === "running") {
+                    console.log(`[TINYFISH PROGRESS] ${data.purpose || "Running..."}`);
+                    yield { type: "PROGRESS", purpose: data.purpose };
+                } else if (data.status === "completed") {
+                    console.log(`[TINYFISH COMPLETE] Run completed successfully! Parsing JSON response...`);
+                    let parsedResult = {};
+                    try {
+                        const content = data.result?.message?.content || "";
+                        const jsonMatch = content.match(/```json\n([\s\S]*)\n```/) || content.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            parsedResult = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                        } else {
+                            parsedResult = JSON.parse(content);
+                        }
+                    } catch (e) {
+                        console.error("\n❌ [TINYFISH JSON PARSE ERROR] Failed to parse TinyFish JSON output:", data.result?.message?.content);
+                    }
+                    yield { type: "COMPLETE", resultJson: parsedResult };
+                    return;
+                } else if (data.status === "failed") {
+                    console.error(`\n❌ [TINYFISH EXECUTION FAILED] The AI agent failed its task:`, data.error);
+                    yield { type: "ERROR", error: new Error(data.error || "Unknown TinyFish failure") };
                     return;
                 }
-            } catch {
-                // Skip unparseable lines
+            } catch (err: any) {
+                console.warn(`⚠️ [TINYFISH WARNING] Failed to parse SSE JSON chunk: "${jsonStr.substring(0, 100)}..." Error: ${err.message}`);
+                // Ignore parse errors for malformed SSE chunks
             }
         }
     }
@@ -186,26 +239,35 @@ export async function* streamTinyFishRun(
  */
 export async function runTinyFishSync(url: string, goal: string): Promise<any> {
     const apiKey = getApiKey();
+    console.log(`\n[TINYFISH SYNC] Starting sync run for URL: ${url}`);
 
-    const response = await fetch(`${TINYFISH_API_URL}/run`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": apiKey,
-        },
-        body: JSON.stringify({
-            url,
-            goal,
-            browser_profile: "stealth",
-            proxy_config: { enabled: true, country_code: "US" },
-        }),
-    });
+    let response;
+    try {
+        response = await fetch(`${TINYFISH_API_URL}/run`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+                url,
+                goal,
+                browser_profile: "stealth",
+                proxy_config: { enabled: true, country_code: "US" },
+            }),
+        });
+    } catch (e: any) {
+        console.error(`\n❌ [TINYFISH SYNC ERROR] Network failed connecting to API:`, e);
+        throw new Error(`Failed to reach TinyFish API: ${e.message}`);
+    }
 
     if (!response.ok) {
         const errText = await response.text();
+        console.error(`\n❌ [TINYFISH SYNC ERROR] API returned status ${response.status}: ${errText}`);
         throw new Error(`TinyFish API error: ${response.status} ${errText}`);
     }
 
+    console.log(`[TINYFISH SYNC] Request succeeded.`);
     return response.json();
 }
 
@@ -213,9 +275,7 @@ export async function runTinyFishSync(url: string, goal: string): Promise<any> {
  * Discover grants from a specific portal using TinyFish.
  * Streams events for real-time progress.
  */
-export async function* discoverGrants(
-    options: DiscoveryOptions
-): AsyncGenerator<TinyFishEvent> {
+export async function* discoverGrants(options: DiscoveryOptions): AsyncGenerator<TinyFishEvent> {
     const portalUrl = PORTAL_URLS[options.portal] || options.portal;
     const goal = buildDiscoveryGoal(options);
 
@@ -236,11 +296,7 @@ export async function extractGrantDetails(grantUrl: string): Promise<any> {
 /**
  * Research grant requirements and generate draft content.
  */
-export async function* researchAndDraft(
-    grantUrl: string,
-    grantTitle: string,
-    orgProfile: string
-): AsyncGenerator<TinyFishEvent> {
+export async function* researchAndDraft(grantUrl: string, grantTitle: string, orgProfile: string): AsyncGenerator<TinyFishEvent> {
     const goal = buildDraftResearchGoal(grantTitle, orgProfile);
 
     for await (const event of streamTinyFishRun(grantUrl, goal)) {

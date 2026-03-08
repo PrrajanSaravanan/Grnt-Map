@@ -146,7 +146,7 @@ router.post("/discover", async (req: Request, res: Response) => {
             }
         }
     } catch (err: any) {
-        console.error("Discovery error:", err);
+        console.error("\n❌ [SERVER DISCOVERY ERROR] The discovery process was interrupted or failed:", err);
         db.prepare("UPDATE discovery_runs SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(runId);
         sendEvent({ type: "DISCOVERY_ERROR", runId, error: err.message });
     }

@@ -16,6 +16,7 @@ import { GrantNode } from "./GrantNode";
 import { GrantDetailsPanel } from "./GrantDetailsPanel";
 import { AnimatePresence } from "motion/react";
 import { useAppContext } from "@/AppContext";
+import { Loader2 } from "lucide-react";
 
 const nodeTypes = {
   grant: GrantNode,
@@ -69,41 +70,40 @@ export function MindMap({ onSelectionChange, onApplyGrant }: MindMapProps) {
 
   // Initialize visible grants only once
   useEffect(() => {
+    console.log(`[MindMap] availableGrants.length=${availableGrants.length}, initialized=${initializedRef.current}`);
     if (!initializedRef.current && availableGrants.length > 0) {
       initializedRef.current = true;
       const sorted = [...availableGrants].sort((a, b) => b.matchScore - a.matchScore);
-      setVisibleGrantIds(sorted.slice(0, 6).map(g => g.id));
+      const ids = sorted.slice(0, 6).map(g => g.id);
+      console.log(`[MindMap] initializing visibleGrantIds:`, ids);
+      setVisibleGrantIds(ids);
     }
   }, [availableGrants]);
 
-  // When a grant is removed (applied), refresh visible IDs
-  const prevAvailableIdsRef = useRef<string[]>([]);
+  // Update visible grants when availableGrants changes
   useEffect(() => {
-    const currentIds = availableGrants.map(g => g.id);
-    const prevIds = prevAvailableIdsRef.current;
-    prevAvailableIdsRef.current = currentIds;
+    // Check if we need to add new grants (up to max 6)
+    const currentIdSet = new Set(availableGrants.map(g => g.id));
+    const validVisible = visibleGrantIds.filter(id => currentIdSet.has(id));
 
-    // Skip on first render
-    if (prevIds.length === 0) return;
+    // If we have room for more and there are available grants not currently visible
+    if (validVisible.length < 6) {
+      const remainingToAdd = availableGrants
+        .filter(g => !validVisible.includes(g.id))
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 6 - validVisible.length);
 
-    // Check if any currently visible grants were removed
-    const currentIdSet = new Set(currentIds);
-    const removedFromVisible = visibleGrantIds.filter(id => !currentIdSet.has(id));
-
-    if (removedFromVisible.length > 0) {
-      const remaining = availableGrants
-        .filter(g => !visibleGrantIds.includes(g.id) || removedFromVisible.includes(g.id))
-        .filter(g => currentIdSet.has(g.id))
-        .sort((a, b) => b.matchScore - a.matchScore);
-
-      const newVisible = visibleGrantIds.filter(id => currentIdSet.has(id));
-      const toAdd = remaining
-        .filter(g => !newVisible.includes(g.id))
-        .slice(0, 6 - newVisible.length);
-
-      setVisibleGrantIds([...newVisible, ...toAdd.map(g => g.id)]);
+      if (remainingToAdd.length > 0) {
+        setVisibleGrantIds([...validVisible, ...remainingToAdd.map(g => g.id)]);
+        return; // State update will trigger re-render
+      }
     }
-  }, [availableGrants]); // Safe because availableGrants is memoized
+
+    // If some visible grants were removed (applied), update the array
+    if (validVisible.length !== visibleGrantIds.length) {
+      setVisibleGrantIds(validVisible);
+    }
+  }, [availableGrants, visibleGrantIds]);
 
   // Helper for edge colors
   const getEdgeColor = useCallback((score: number) => {
@@ -147,6 +147,7 @@ export function MindMap({ onSelectionChange, onApplyGrant }: MindMapProps) {
     // Top Grant
     if (topGrant) {
       const topColor = getEdgeColor(topGrant.matchScore);
+      console.log(`[MindMap] topGrant: id=${topGrant.id} position={x:0, y:250}`);
       newNodes.push({
         id: topGrant.id,
         type: "grant",
@@ -177,6 +178,7 @@ export function MindMap({ onSelectionChange, onApplyGrant }: MindMapProps) {
       const x = centerX + Math.cos(angle) * radius;
       const y = centerY + Math.sin(angle) * radius;
       const edgeColor = getEdgeColor(grant.matchScore);
+      console.log(`[MindMap] grant ${grant.id} position={x:${Math.round(x)}, y:${Math.round(y)}}`);
 
       newNodes.push({
         id: grant.id,
@@ -195,12 +197,25 @@ export function MindMap({ onSelectionChange, onApplyGrant }: MindMapProps) {
       });
     });
 
+    console.log(`[MindMap] rendering ${newNodes.length} nodes, ${newEdges.length} edges`);
     setNodes(newNodes);
     setEdges(newEdges);
   }, [visibleGrantIds, availableGrants, setNodes, setEdges, orgName, getEdgeColor]);
 
   return (
-    <div className="w-full h-full bg-zinc-950 relative">
+    <div
+      className="w-full h-full bg-zinc-950 relative"
+      style={{ minHeight: "600px", width: "100%" }}
+    >
+      {/* Loading overlay — shown while discovering and no grants yet */}
+      {ctx.isDiscovering && availableGrants.length === 0 && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-zinc-950/90">
+          <Loader2 size={36} className="animate-spin text-emerald-500" />
+          <p className="text-sm text-zinc-400 font-medium tracking-wide">Discovering grants…</p>
+          <p className="text-xs text-zinc-600">TinyFish agent is scanning grant portals</p>
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}

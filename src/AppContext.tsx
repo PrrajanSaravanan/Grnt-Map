@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import type { Grant } from "@/data/grants";
+import { INITIAL_GRANTS } from "@/data/grants";
 
 // --- Types ---
 
@@ -105,6 +106,8 @@ const defaultProfile: UserProfile = {
 };
 
 const STORAGE_KEY = "grantweave_auth";
+const GRANTS_CACHE_KEY = "grantweave_grants_cache";
+const DISCOVERY_DONE_KEY = "grantweave_discovery_done";
 
 function loadAuth(): { userId: number | string } | null {
     try {
@@ -117,6 +120,23 @@ function loadAuth(): { userId: number | string } | null {
 function saveAuth(userId: number | string) {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ userId }));
+    } catch { /* ignore */ }
+}
+
+function loadGrantsCache(): Grant[] | null {
+    try {
+        const raw = sessionStorage.getItem(GRANTS_CACHE_KEY);
+        if (raw) {
+            const parsed: Grant[] = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch { /* ignore */ }
+    return null;
+}
+
+function saveGrantsCache(grants: Grant[]) {
+    try {
+        sessionStorage.setItem(GRANTS_CACHE_KEY, JSON.stringify(grants));
     } catch { /* ignore */ }
 }
 
@@ -143,17 +163,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isDiscovering: false,
     });
 
-    // Helper to refresh grants
+    // Prevent multiple TinyFish discovery calls within a session
+    const discoveryCalledRef = useRef<boolean>(
+        typeof sessionStorage !== "undefined"
+            ? sessionStorage.getItem(DISCOVERY_DONE_KEY) === "true"
+            : false
+    );
+
+    // Helper to refresh grants — falls back to mock data if backend returns empty
     const fetchGrants = useCallback(async () => {
         if (!state.userProfile?.id) return;
+
+        // Check session cache first
+        const cached = loadGrantsCache();
+        if (cached) {
+            console.log(`[GrantWeave] fetchGrants: using session-cached grants (${cached.length} items)`);
+            setState(prev => ({ ...prev, grants: cached }));
+            return;
+        }
+
+        console.log(`[GrantWeave] fetchGrants: fetching from backend for userId=${state.userProfile.id}`);
         try {
             const res = await fetch(`${API_BASE}/grants?userId=${state.userProfile.id}`);
             if (res.ok) {
-                const grants = await res.json();
-                setState(prev => ({ ...prev, grants }));
+                const grants: Grant[] = await res.json();
+                console.log(`[GrantWeave] fetchGrants: received ${grants.length} grants from backend`);
+
+                if (grants.length === 0) {
+                    // Backend returned nothing — use mock data so the mind map always renders
+                    console.warn("[GrantWeave] fetchGrants: backend returned 0 grants — loading mock data fallback");
+                    saveGrantsCache(INITIAL_GRANTS);
+                    setState(prev => ({ ...prev, grants: INITIAL_GRANTS }));
+                } else {
+                    saveGrantsCache(grants);
+                    setState(prev => ({ ...prev, grants }));
+                }
+            } else {
+                console.warn(`[GrantWeave] fetchGrants: backend responded with status ${res.status} — loading mock data fallback`);
+                saveGrantsCache(INITIAL_GRANTS);
+                setState(prev => ({ ...prev, grants: INITIAL_GRANTS }));
             }
         } catch (err) {
-            console.error("Failed to fetch grants:", err);
+            console.error("[GrantWeave] fetchGrants: network error — loading mock data fallback:", err);
+            saveGrantsCache(INITIAL_GRANTS);
+            setState(prev => ({ ...prev, grants: INITIAL_GRANTS }));
         }
     }, [state.userProfile?.id]);
 
@@ -402,7 +455,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const discoverGrants = useCallback(async () => {
         if (!state.userProfile?.id || state.isDiscovering) return;
 
+        // Prevent multiple TinyFish calls per session
+        if (discoveryCalledRef.current) {
+            console.log("[GrantWeave] discoverGrants: discovery already called this session — skipping TinyFish call");
+            return;
+        }
+
+        discoveryCalledRef.current = true;
+        try { sessionStorage.setItem(DISCOVERY_DONE_KEY, "true"); } catch { /* ignore */ }
+
+        console.log(`[GrantWeave] discoverGrants: triggering TinyFish for userId=${state.userProfile.id}`);
         setState(prev => ({ ...prev, isDiscovering: true, discoveryLogs: [] }));
+
+        // 10-second timeout: if TinyFish is too slow, fall back to mock data
+        const fallbackTimer = setTimeout(() => {
+            setState(prev => {
+                const hasMockFallback = prev.grants.length === 0;
+                if (hasMockFallback) {
+                    console.warn("[GrantWeave] discoverGrants: TinyFish timeout (10s) — loading mock data fallback");
+                    saveGrantsCache(INITIAL_GRANTS);
+                    return { ...prev, grants: INITIAL_GRANTS };
+                }
+                return prev;
+            });
+        }, 10000);
 
         try {
             const res = await fetch(`${API_BASE}/grants/discover`, {
@@ -467,6 +543,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                             addLog(`TinyFish error: ${data.error?.message || "Unknown"}`, "warning", "TinyFish Agent");
                         } else if (data.type === "DISCOVERY_COMPLETE") {
                             newGrantsCount = data.grantsStored || 0;
+                            console.log(`[GrantWeave] discoverGrants: DISCOVERY_COMPLETE — grantsStored=${newGrantsCount}`);
                             addLog(`Stored ${newGrantsCount} new matching grants`, "success", "Swarm Coordinator");
                         } else if (data.type === "DISCOVERY_ERROR") {
                             addLog(`Discovery failed: ${data.error}`, "warning", "Swarm Coordinator");
@@ -478,12 +555,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
 
             if (newGrantsCount > 0) {
+                // Clear cache so fetchGrants hits the DB for fresh results
+                try { sessionStorage.removeItem(GRANTS_CACHE_KEY); } catch { /* ignore */ }
                 await fetchGrants();
+            } else {
+                // TinyFish completed but found 0 new grants — fall back to mock data
+                console.warn("[GrantWeave] discoverGrants: TinyFish returned 0 new grants — loading mock data fallback");
+                setState(prev => (prev.grants.length === 0 ? { ...prev, grants: INITIAL_GRANTS } : prev));
+                saveGrantsCache(INITIAL_GRANTS);
             }
         } catch (err: any) {
-            console.error("Discovery error:", err);
+            console.error("[GrantWeave] discoverGrants error:", err);
             setState(prev => ({
                 ...prev,
+                grants: prev.grants.length === 0 ? INITIAL_GRANTS : prev.grants,
                 discoveryLogs: [{
                     id: Math.random().toString(36).substring(7),
                     agent: "System",
@@ -492,7 +577,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
                     timestamp: Date.now()
                 }, ...prev.discoveryLogs]
             }));
+            // (fallback to INITIAL_GRANTS is already applied inside the setState above)
         } finally {
+            clearTimeout(fallbackTimer);
             setState(prev => ({ ...prev, isDiscovering: false }));
         }
 
@@ -506,12 +593,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const logout = useCallback(() => {
         localStorage.removeItem(STORAGE_KEY);
+        try {
+            sessionStorage.removeItem(GRANTS_CACHE_KEY);
+            sessionStorage.removeItem(DISCOVERY_DONE_KEY);
+        } catch { /* ignore */ }
+        discoveryCalledRef.current = false;
         setState({
             isAuthenticated: false,
             hasOnboarded: false,
             userProfile: null,
             grants: [],
             applications: {},
+            discoveryLogs: [],
+            isDiscovering: false,
         });
     }, []);
 

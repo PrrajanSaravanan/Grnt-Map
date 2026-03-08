@@ -65,7 +65,7 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS discovery_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
     portal TEXT NOT NULL DEFAULT '',
     status TEXT DEFAULT 'pending',

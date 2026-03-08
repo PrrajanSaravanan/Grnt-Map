@@ -2,7 +2,20 @@ node_modules/
 build/
 dist/
 coverage/
-.DS_Store
-*.log
-.env*
+
+# Environment variables
+.env
+.env.*
 !.env.example
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

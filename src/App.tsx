@@ -78,7 +78,7 @@ function AppInner() {
           {/* Central View Switcher */}
           {currentView === "dashboard" ? (
             <div className="flex-1 relative bg-zinc-950 flex flex-col">
-              <div className="flex-1 relative">
+              <div className="flex-1 relative" style={{ minHeight: "600px" }}>
                 <ReactFlowProvider>
                   <MindMap onSelectionChange={setIsGrantSelected} onApplyGrant={handleApplyFromMap} />
                 </ReactFlowProvider>
