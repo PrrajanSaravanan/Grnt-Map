@@ -70,10 +70,18 @@ router.post("/discover", async (req: Request, res: Response) => {
 
     // Create discovery run record
     const runId = randomUUID();
-    db.prepare(`
-    INSERT INTO discovery_runs (id, user_id, portal, status, goal)
-    VALUES (?, ?, ?, 'running', ?)
-  `).run(runId, userId, portalName, `Discovering ${focusAreas?.join(", ")} grants`);
+    const areasGoal = Array.isArray(focusAreas) ? focusAreas.join(", ") : (focusAreas || "");
+
+    try {
+        db.prepare(`
+        INSERT INTO discovery_runs (id, user_id, portal, status, goal)
+        VALUES (?, ?, ?, 'running', ?)
+      `).run(runId, userId, portalName, `Discovering ${areasGoal} grants`);
+    } catch (err: any) {
+        console.error("Failed to create discovery_run record:", err);
+        sendEvent({ type: "DISCOVERY_ERROR", runId, error: "Database error during initialization" });
+        return res.end();
+    }
 
     sendEvent({ type: "DISCOVERY_STARTED", runId, portal: portalName });
 
