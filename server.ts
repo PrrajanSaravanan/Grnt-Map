@@ -5,7 +5,7 @@ import http from "http";
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3001;
 
   // Create HTTP server explicitly to attach WebSocket server
   const server = http.createServer(app);
