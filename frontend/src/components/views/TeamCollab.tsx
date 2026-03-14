@@ -34,9 +34,10 @@ export function TeamCollab({ organization }: TeamCollabProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Connect to WebSocket
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    // Connect to WebSocket (use VITE_WS_URL in dev when frontend and backend run on different ports)
+    const wsUrl =
+      import.meta.env.VITE_WS_URL ||
+      `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

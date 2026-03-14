@@ -1,16 +1,21 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
+import cors from "cors";
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3001;
+  const isProduction = process.env.NODE_ENV === "production";
 
-  // Create HTTP server explicitly to attach WebSocket server
+  app.use(cors({ origin: true, credentials: true }));
+  app.use(express.json());
+
   const server = http.createServer(app);
-
-  // WebSocket Server Setup
   const wss = new WebSocketServer({ server });
 
   interface User {
@@ -33,31 +38,29 @@ async function startServer() {
         const message = JSON.parse(data.toString());
 
         switch (message.type) {
-          case "join":
+          case "join": {
             const { name, color } = message;
             const id = Math.random().toString(36).substr(2, 9);
             currentUser = { id, name, color, x: 0, y: 0, ws };
             users.set(id, currentUser);
 
-            // Send initial state to the new user
             ws.send(JSON.stringify({
               type: "init",
               users: Array.from(users.values()).map(u => ({ id: u.id, name: u.name, color: u.color, x: u.x, y: u.y })),
               messages
             }));
 
-            // Broadcast new user to others
             broadcast({
               type: "user_joined",
               user: { id, name, color, x: 0, y: 0 }
             }, ws);
             break;
+          }
 
           case "cursor":
             if (currentUser) {
               currentUser.x = message.x;
               currentUser.y = message.y;
-              // Broadcast cursor update (exclude sender for performance, or include if needed)
               broadcast({
                 type: "cursor_update",
                 userId: currentUser.id,
@@ -76,13 +79,8 @@ async function startServer() {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               };
               messages.push(chatMsg);
-              if (messages.length > 50) messages.shift(); // Keep last 50 messages
-
-              // Broadcast chat message to ALL users (including sender)
-              broadcast({
-                type: "chat_message",
-                message: chatMsg
-              });
+              if (messages.length > 50) messages.shift();
+              broadcast({ type: "chat_message", message: chatMsg });
             }
             break;
         }
@@ -94,15 +92,12 @@ async function startServer() {
     ws.on("close", () => {
       if (currentUser) {
         users.delete(currentUser.id);
-        broadcast({
-          type: "user_left",
-          userId: currentUser.id
-        });
+        broadcast({ type: "user_left", userId: currentUser.id });
       }
     });
   });
 
-  function broadcast(data: any, exclude?: WebSocket) {
+  function broadcast(data: object, exclude?: WebSocket) {
     const message = JSON.stringify(data);
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN && client !== exclude) {
@@ -111,17 +106,13 @@ async function startServer() {
     });
   }
 
-  // API routes
-  app.use(express.json());
-
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
   app.get("/api/grants", async (req, res) => {
-    const query = req.query.q as string || "climate";
+    const query = (req.query.q as string) || "climate";
     try {
-      // Fetching live data from Grants.gov public API (No API key required)
       const response = await fetch("https://apply07.grants.gov/grantsws/rest/opportunities/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,11 +132,11 @@ async function startServer() {
         amount: opp.estimatedFunding ? `$${opp.estimatedFunding.toLocaleString()}` : "Varies",
         deadline: opp.closeDate || "Rolling",
         portal: opp.agency || "Grants.gov",
-        matchScore: Math.floor(Math.random() * 15) + 80, // 80-95
+        matchScore: Math.floor(Math.random() * 15) + 80,
         description: opp.description || `Funding opportunity provided by ${opp.agency}.`,
         url: `https://www.grants.gov/search-results-detail/${opp.id}`,
         matchReason: `Matches your search for "${query}" within the ${opp.agency} database.`,
-        probability: Math.floor(Math.random() * 20) + 50, // 50-70
+        probability: Math.floor(Math.random() * 20) + 50,
         probabilityReason: "Based on historical agency funding rates.",
         requirements: ["Eligible organization", "Matches agency mission", "Timely submission"],
         location: "USA / Global",
@@ -154,7 +145,7 @@ async function startServer() {
 
       res.json(grants);
     } catch (error) {
-      console.error("Live fetch error, falling back to robust mock data:", error);
+      console.error("Live fetch error, falling back to mock data:", error);
       res.json([
         {
           id: "mock-1",
@@ -224,20 +215,16 @@ async function startServer() {
     res.json(content);
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+  if (isProduction) {
+    const distPath = path.resolve(__dirname, "../frontend/dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
-    app.use(vite.middlewares);
-  } else {
-    // Production static file serving (if needed)
-    app.use(express.static("dist"));
   }
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Backend running on http://localhost:${PORT}`);
   });
 }
 
