@@ -4,7 +4,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -49,5 +49,35 @@ export async function signUpAndCreateProfile(params: {
 export async function signInUser(email: string, password: string) {
   const credential = await signInWithEmailAndPassword(auth, email, password);
   return credential.user;
+}
+
+/** Payload for onboarding completion — matches Firestore users/{uid} schema */
+export interface OnboardingPayload {
+  mission: string;
+  focusAreas: string[];
+  fundingNeeds: {
+    minGrantSize: number;
+    maxGrantSize: number;
+    timeline: string;
+    regions: string[];
+  };
+  operationalContext: {
+    teamSize: string;
+    yearsOperating: number;
+    previousGrantExperience: string;
+    internationalEligibility: boolean;
+  };
+}
+
+export async function updateUserOnboarding(userId: string, data: OnboardingPayload) {
+  const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, {
+    mission: data.mission,
+    focusAreas: data.focusAreas,
+    fundingNeeds: data.fundingNeeds,
+    operationalContext: data.operationalContext,
+    onboardingCompleted: true,
+    updatedAt: serverTimestamp(),
+  });
 }
 

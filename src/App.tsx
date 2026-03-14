@@ -7,7 +7,6 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { ActivityFeed } from "@/components/ActivityFeed";
-import { Timeline } from "@/components/Timeline";
 import { MindMap } from "@/components/MindMap";
 import { Onboarding } from "@/components/views/Onboarding";
 import { Reports } from "@/components/views/Reports";
@@ -20,6 +19,8 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { ActiveMonitoringWidget } from "@/components/ActiveMonitoringWidget";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { Grant, Application, Organization } from "@/types";
+import { auth } from "@/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 const DEFAULT_ORG: Organization = {
   name: "EcoYouth Nonprofit",
@@ -36,11 +37,17 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [currentView, setCurrentView] = useState("dashboard");
+  const [userId, setUserId] = useState<string | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isGrantSelected, setIsGrantSelected] = useState(false);
   const [selectedGrantForBuilder, setSelectedGrantForBuilder] = useState<Grant | null>(null);
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [organizationProfile, setOrganizationProfile] = useState<Organization>(DEFAULT_ORG);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => setUserId(user?.uid ?? null));
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -99,7 +106,7 @@ export default function App() {
   }
 
   if (!hasOnboarded && currentView === "onboarding") {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return <Onboarding userId={userId} onComplete={handleOnboardingComplete} />;
   }
 
   return (
@@ -154,7 +161,7 @@ export default function App() {
               organization={organizationProfile}
             />
           ) : currentView === "onboarding" ? (
-            <Onboarding onComplete={handleOnboardingComplete} />
+            <Onboarding userId={userId} onComplete={handleOnboardingComplete} />
           ) : currentView === "reports" ? (
             <Reports organization={organizationProfile} />
           ) : currentView === "collab" ? (
