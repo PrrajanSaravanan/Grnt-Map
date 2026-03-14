@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "motion/react";
-import { Upload, Check, ArrowRight, Building2, Target, DollarSign, Globe2, Users, Zap } from "lucide-react";
+import { Upload, Check, ArrowRight, Building2, Target, DollarSign, Globe2, Users, Zap, FileText, Loader2, X } from "lucide-react";
 
 import { Organization } from "@/types";
 import { updateUserOnboarding } from "@/firebase";
+import { extractTextFromPdf, parsePdfSections, parseFundingFromText, parseOperationalFromText, parseContactFromText } from "@/lib/pdfText";
 
 interface OnboardingProps {
   userId: string | null;
@@ -18,6 +19,12 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
   const [newRegionInput, setNewRegionInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pitchDocText, setPitchDocText] = useState<string | null>(null);
+  const [documentTextSection, setDocumentTextSection] = useState<string | null>(null);
+  const [parsedContactFromPdf, setParsedContactFromPdf] = useState<{ fullName?: string; email?: string; organizationName?: string; organizationType?: string; country?: string } | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     mission: "To empower underrepresented youth through climate education and sustainable community projects in urban areas.",
     focusAreas: ["Climate Action", "Youth Education", "Community Dev"],
@@ -41,8 +48,10 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
   const handleComplete = async () => {
     setSaveError(null);
     setIsSaving(true);
-    const minGrantSize = parseGrantNumber(formData.minGrant);
-    const maxGrantSize = parseGrantNumber(formData.maxGrant);
+    const minGrantSize = Math.max(0, parseGrantNumber(formData.minGrant)) || 50000;
+    const maxGrantSize = Math.max(0, parseGrantNumber(formData.maxGrant)) || 150000;
+    const regions = formData.regions?.length ? formData.regions : ["United States"];
+    const yearsOperating = parseInt(String(formData.yearsOperating), 10);
     const orgData: Partial<Organization> = {
       name: "My Organization",
       pastGrants: [],
@@ -51,7 +60,7 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
       minGrant: formatGrantDisplay(formData.minGrant),
       maxGrant: formatGrantDisplay(formData.maxGrant),
       timeline: formData.timeline,
-      regions: formData.regions,
+      regions,
       teamSize: formData.teamSize,
       yearsOperating: formData.yearsOperating,
       internationalEligible: formData.internationalEligible,
@@ -61,19 +70,27 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
       try {
         await updateUserOnboarding(userId, {
           mission: formData.mission,
-          focusAreas: formData.focusAreas,
+          focusAreas: Array.isArray(formData.focusAreas) ? formData.focusAreas : [],
           fundingNeeds: {
             minGrantSize,
             maxGrantSize,
             timeline: formData.timeline,
-            regions: formData.regions,
+            regions,
           },
           operationalContext: {
             teamSize: formData.teamSize,
-            yearsOperating: parseInt(formData.yearsOperating, 10) || 0,
+            yearsOperating: Number.isFinite(yearsOperating) ? yearsOperating : 4,
             previousGrantExperience: formData.previousGrantExperience,
-            internationalEligibility: formData.internationalEligible,
+            internationalEligibility: Boolean(formData.internationalEligible),
           },
+          pitchDocText: (documentTextSection && documentTextSection.trim() !== "") ? documentTextSection : (pitchDocText || null),
+          ...(parsedContactFromPdf && {
+            fullName: parsedContactFromPdf.fullName ?? undefined,
+            email: parsedContactFromPdf.email ?? undefined,
+            organizationName: parsedContactFromPdf.organizationName ?? undefined,
+            type: parsedContactFromPdf.organizationType ?? undefined,
+            country: parsedContactFromPdf.country ?? undefined,
+          }),
         });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to save to database.";
@@ -96,6 +113,51 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
 
   const removeRegion = (region: string) => {
     setFormData(prev => ({ ...prev, regions: prev.regions.filter(r => r !== region) }));
+  };
+
+  const handlePdfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setExtractError(null);
+    setIsExtracting(true);
+    try {
+      const fullText = await extractTextFromPdf(file);
+      setPitchDocText(fullText);
+      if (fullText && !fullText.startsWith("(No text")) {
+        const parsed = parsePdfSections(fullText);
+        const funding = parseFundingFromText(parsed.fundingText);
+        const operational = parseOperationalFromText(parsed.operationalText);
+        const contact = parseContactFromText(parsed.contactText);
+        setDocumentTextSection(parsed.documentText.trim() ? parsed.documentText : null);
+        setParsedContactFromPdf(Object.keys(contact).length > 0 ? contact : null);
+        setFormData((prev) => ({
+          ...prev,
+          mission: parsed.mission.slice(0, 1500),
+          focusAreas: parsed.focusAreas.length > 0 ? parsed.focusAreas : prev.focusAreas,
+          minGrant: funding.minGrant,
+          maxGrant: funding.maxGrant,
+          timeline: funding.timeline,
+          regions: funding.regions.length > 0 ? funding.regions : prev.regions,
+          teamSize: operational.teamSize,
+          yearsOperating: String(operational.yearsOperating),
+          previousGrantExperience: operational.previousGrantExperience,
+          internationalEligible: operational.internationalEligibility,
+          ...(contact.organizationType && { type: contact.organizationType }),
+        }));
+      }
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : "Could not read PDF.");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const clearPitchDoc = () => {
+    setPitchDocText(null);
+    setDocumentTextSection(null);
+    setParsedContactFromPdf(null);
+    setExtractError(null);
   };
 
   const updateField = (field: string, value: any) => {
@@ -165,12 +227,65 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
                   />
                 </div>
                 
-                <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-emerald-500/50 hover:bg-zinc-950/50 transition-colors cursor-pointer group">
-                  <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                    <Upload className="text-zinc-400 group-hover:text-emerald-400" size={20} />
-                  </div>
-                  <p className="text-white font-medium text-sm">Upload 501(c)(3) or Pitch Deck</p>
-                  <p className="text-xs text-zinc-500 mt-1">PDF up to 10MB (Optional)</p>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">501(c)(3) or Pitch Deck (optional)</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={handlePdfChange}
+                    aria-label="Choose PDF to extract text"
+                  />
+                  {!pitchDocText ? (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => fileInputRef.current?.click()}
+                      onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-emerald-500/50 hover:bg-zinc-950/50 transition-colors cursor-pointer group"
+                    >
+                      {isExtracting ? (
+                        <>
+                          <Loader2 className="text-emerald-400 animate-spin mb-3" size={24} />
+                          <p className="text-white font-medium text-sm">Extracting text from PDF…</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                            <Upload className="text-zinc-400 group-hover:text-emerald-400" size={20} />
+                          </div>
+                          <p className="text-white font-medium text-sm">Choose PDF – we’ll extract and store the text only</p>
+                          <p className="text-xs text-zinc-500 mt-1">PDF up to 10MB (Optional). File is not stored.</p>
+                        </>
+                      )}
+                      {extractError && <p className="text-sm text-red-400 mt-2">{extractError}</p>}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-zinc-950 border border-emerald-500/30 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-emerald-400 flex items-center gap-2">
+                          <FileText size={18} /> Text extracted from PDF
+                        </span>
+                        <button type="button" onClick={clearPitchDoc} className="p-1 text-zinc-400 hover:text-white" aria-label="Remove">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-zinc-400 line-clamp-3">{pitchDocText.slice(0, 200)}{pitchDocText.length > 200 ? "…" : ""}</p>
+                      <p className="text-xs text-zinc-500">{pitchDocText.length} characters • Mission & focus areas updated from PDF</p>
+                      {userId && (
+                        <button
+                          type="button"
+                          onClick={handleComplete}
+                          disabled={isSaving}
+                          className="mt-3 w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold py-2.5 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2"
+                        >
+                          {isSaving ? "Saving…" : "Save & go to dashboard"}
+                          <ArrowRight size={18} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

@@ -1,15 +1,41 @@
-import { Shield, Database, Key, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { useState } from "react";
+import { Shield, Database, Key, ToggleLeft, ToggleRight, FileDown } from "lucide-react";
 import { Organization } from "@/types";
+import { auth, getCurrentUserProfile } from "@/firebase";
+import { downloadProfilePdf } from "@/lib/profilePdf";
 
 interface SettingsProps {
   organization?: Organization;
 }
 
 export function Settings({ organization }: SettingsProps) {
-  // Generate a consistent "API Key" based on org name
+  const [profilePdfLoading, setProfilePdfLoading] = useState(false);
+  const [profilePdfError, setProfilePdfError] = useState<string | null>(null);
+
+  const handleDownloadProfilePdf = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      setProfilePdfError("Sign in to download your profile.");
+      return;
+    }
+    setProfilePdfError(null);
+    setProfilePdfLoading(true);
+    try {
+      const profile = await getCurrentUserProfile(user.uid);
+      if (!profile) {
+        setProfilePdfError("No profile data found.");
+        return;
+      }
+      downloadProfilePdf(profile);
+    } catch (e) {
+      setProfilePdfError(e instanceof Error ? e.message : "Failed to generate PDF.");
+    } finally {
+      setProfilePdfLoading(false);
+    }
+  };
+
   const orgSlug = (organization?.name || "tinyfish").toLowerCase().replace(/[^a-z0-9]/g, "");
   const apiKey = `sk_live_${orgSlug}_${Math.floor(Math.random() * 1000000000)}`;
-  
   const checkpointId = Math.floor(Math.random() * 1000) + 500;
   const records = Math.floor(Math.random() * 100) + 20;
 
@@ -19,6 +45,28 @@ export function Settings({ organization }: SettingsProps) {
         <h2 className="text-2xl font-bold text-white mb-8">Settings & Akasha Ledger</h2>
 
         <div className="space-y-6">
+          {/* Profile export */}
+          <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                <FileDown className="text-emerald-400" size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white mb-1">Profile export</h3>
+                <p className="text-sm text-zinc-400 mb-4">Download your organization profile (contact, mission, focus areas, funding needs, document text) as a PDF.</p>
+                {profilePdfError && <p className="text-sm text-red-400 mb-2">{profilePdfError}</p>}
+                <button
+                  type="button"
+                  onClick={handleDownloadProfilePdf}
+                  disabled={profilePdfLoading}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-zinc-950 font-medium rounded-lg transition-colors"
+                >
+                  {profilePdfLoading ? "Generating…" : "Download profile (PDF)"}
+                </button>
+              </div>
+            </div>
+          </section>
+
           {/* Persistent Memory */}
           <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
             <div className="flex items-start gap-4">
@@ -77,10 +125,11 @@ export function Settings({ organization }: SettingsProps) {
                 <p className="text-sm text-zinc-400 mb-4">Connect your custom agent swarms via API.</p>
                 
                 <div className="flex gap-2">
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     value={apiKey}
-                    readOnly 
+                    readOnly
+                    aria-label="API key"
                     className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400 font-mono"
                   />
                   <button className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors">

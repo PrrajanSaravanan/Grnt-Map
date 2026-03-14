@@ -4,7 +4,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { getFirestore, doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, setDoc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -38,9 +38,10 @@ export async function signUpAndCreateProfile(params: {
     fullName,
     organizationName,
     organizationType,
+    type: organizationType,
     country,
     email,
-    createdAt: new Date().toISOString(),
+    createdAt: serverTimestamp(),
   });
 
   return user;
@@ -51,7 +52,7 @@ export async function signInUser(email: string, password: string) {
   return credential.user;
 }
 
-/** Payload for onboarding completion — matches Firestore users/{uid} schema */
+/** Payload for onboarding completion — matches Firestore users/{uid} schema. Each field stored in its own Firestore field. */
 export interface OnboardingPayload {
   mission: string;
   focusAreas: string[];
@@ -67,17 +68,66 @@ export interface OnboardingPayload {
     previousGrantExperience: string;
     internationalEligibility: boolean;
   };
+  /** Only the "Document text" section from PDF (not the full PDF text). */
+  pitchDocText?: string | null;
+  /** Optional: from PDF Contact section — stored in respective top-level fields. */
+  fullName?: string | null;
+  email?: string | null;
+  organizationName?: string | null;
+  type?: string | null;
+  country?: string | null;
 }
 
 export async function updateUserOnboarding(userId: string, data: OnboardingPayload) {
   const userRef = doc(db, "users", userId);
-  await updateDoc(userRef, {
+  const payload: Record<string, unknown> = {
     mission: data.mission,
-    focusAreas: data.focusAreas,
+    focusAreas: Array.isArray(data.focusAreas) ? data.focusAreas : [],
     fundingNeeds: data.fundingNeeds,
     operationalContext: data.operationalContext,
     onboardingCompleted: true,
     updatedAt: serverTimestamp(),
-  });
+  };
+  if (data.pitchDocText != null && data.pitchDocText !== "") {
+    payload.pitchDocText = data.pitchDocText;
+  }
+  if (data.fullName != null && data.fullName !== "") payload.fullName = data.fullName;
+  if (data.email != null && data.email !== "") payload.email = data.email;
+  if (data.organizationName != null && data.organizationName !== "") payload.organizationName = data.organizationName;
+  if (data.type != null && data.type !== "") payload.type = data.type;
+  if (data.country != null && data.country !== "") payload.country = data.country;
+  await updateDoc(userRef, payload);
+}
+
+/** User profile as stored in Firestore users/{uid} */
+export interface UserProfile {
+  fullName?: string;
+  email?: string;
+  organizationName?: string;
+  organizationType?: string;
+  country?: string;
+  mission?: string;
+  focusAreas?: string[];
+  fundingNeeds?: {
+    minGrantSize?: number;
+    maxGrantSize?: number;
+    timeline?: string;
+    regions?: string[];
+  };
+  operationalContext?: {
+    teamSize?: string;
+    yearsOperating?: number;
+    previousGrantExperience?: string;
+    internationalEligibility?: boolean;
+  };
+  pitchDocText?: string | null;
+  onboardingCompleted?: boolean;
+  createdAt?: string;
+  updatedAt?: unknown;
+}
+
+export async function getCurrentUserProfile(userId: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, "users", userId));
+  return snap.exists() ? (snap.data() as UserProfile) : null;
 }
 

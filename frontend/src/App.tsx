@@ -19,7 +19,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { ActiveMonitoringWidget } from "@/components/ActiveMonitoringWidget";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { Grant, Application, Organization } from "@/types";
-import { auth } from "@/firebase";
+import { auth, getCurrentUserProfile } from "@/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 const DEFAULT_ORG: Organization = {
@@ -48,6 +48,32 @@ export default function App() {
     const unsub = onAuthStateChanged(auth, (user) => setUserId(user?.uid ?? null));
     return () => unsub();
   }, []);
+
+  // Load organization from Firestore when user is set (so focusAreas etc. persist after refresh)
+  useEffect(() => {
+    if (!userId) return;
+    getCurrentUserProfile(userId).then((profile) => {
+      if (!profile?.onboardingCompleted) return;
+      const fn = profile.fundingNeeds;
+      const oc = profile.operationalContext;
+      const formatGrant = (n: number) =>
+        n >= 1000000 ? `$${n / 1000000}M` : n >= 1000 ? `$${n / 1000}k` : `$${n}`;
+      setOrganizationProfile((prev) => ({
+        ...prev,
+        name: profile.organizationName ?? prev.name,
+        mission: profile.mission ?? prev.mission,
+        focusAreas: Array.isArray(profile.focusAreas) && profile.focusAreas.length > 0 ? profile.focusAreas : prev.focusAreas,
+        minGrant: fn?.minGrantSize != null ? formatGrant(fn.minGrantSize) : prev.minGrant,
+        maxGrant: fn?.maxGrantSize != null ? formatGrant(fn.maxGrantSize) : prev.maxGrant,
+        timeline: fn?.timeline ?? prev.timeline,
+        regions: (fn?.regions?.length ? fn.regions : undefined) ?? prev.regions,
+        teamSize: oc?.teamSize ?? prev.teamSize,
+        yearsOperating: oc?.yearsOperating != null ? String(oc.yearsOperating) : prev.yearsOperating,
+        internationalEligible: oc?.internationalEligibility ?? prev.internationalEligible,
+        type: profile.organizationType ?? profile.type ?? prev.type,
+      }));
+    });
+  }, [userId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
