@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -11,6 +10,8 @@ import {
   Edge,
   MarkerType,
   Node,
+  NodeChange,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GrantNode } from "./GrantNode";
@@ -27,15 +28,19 @@ interface MindMapProps {
   onSelectionChange?: (isSelected: boolean) => void;
   onApply?: (grant: Grant) => void;
   organization: Organization;
+  wsRef?: React.MutableRefObject<WebSocket | null>;
 }
 
-export function MindMap({ onSelectionChange, onApply, organization }: MindMapProps) {
+export function MindMap({ onSelectionChange, onApply, organization, wsRef }: MindMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedGrant, setSelectedGrant] = useState<Grant | null>(null);
   const [visibleGrantIds, setVisibleGrantIds] = useState<string[]>([]);
   const [availableGrants, setAvailableGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncedFromServer, setSyncedFromServer] = useState(false);
+  const hasSentInitialSync = useRef(false);
+  const isRemoteUpdate = useRef(false);
 
   useEffect(() => {
     const fetchGrants = async () => {
@@ -70,9 +75,36 @@ export function MindMap({ onSelectionChange, onApply, organization }: MindMapPro
     }
   }, []);
 
+  // Wrap onNodesChange to detect user-initiated node drags and broadcast them
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChange(changes);
+
+    // Don't broadcast if this was a remote update
+    if (isRemoteUpdate.current) return;
+    if (!wsRef?.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+    for (const change of changes) {
+      if (change.type === "position" && change.position && change.dragging) {
+        wsRef.current.send(JSON.stringify({
+          type: "node_move",
+          nodeId: change.id,
+          position: change.position,
+        }));
+      }
+    }
+  }, [onNodesChange, wsRef]);
+
   const handleApply = (grant: Grant) => {
     // Call parent handler if exists
     onApply?.(grant);
+
+    // Broadcast removal via WebSocket
+    if (wsRef?.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "node_remove",
+        nodeId: grant.id,
+      }));
+    }
 
     // Remove the applied grant from the map
     setAvailableGrants(prev => prev.filter(g => g.id !== grant.id));
@@ -88,14 +120,16 @@ export function MindMap({ onSelectionChange, onApply, organization }: MindMapPro
 
   // Initialize with top grant + 5 others
   useEffect(() => {
+    if (syncedFromServer) return; // Skip if we already synced from server
     if (visibleGrantIds.length === 0 && availableGrants.length > 0) {
       const initialIds = availableGrants.slice(0, 6).map(g => g.id);
       setVisibleGrantIds(initialIds);
     }
-  }, [availableGrants, visibleGrantIds]);
+  }, [availableGrants, visibleGrantIds, syncedFromServer]);
 
   // Update nodes layout when visible grants change
   useEffect(() => {
+    if (syncedFromServer) return; // Skip if we got state from server
     if (visibleGrantIds.length === 0) return;
 
     const currentGrants = availableGrants.filter(g => visibleGrantIds.includes(g.id));
@@ -180,7 +214,7 @@ export function MindMap({ onSelectionChange, onApply, organization }: MindMapPro
         source: "root",
         target: grant.id,
         animated: true,
-        style: { stroke: edgeColor, strokeWidth: 2 }, // Increased width slightly for visibility
+        style: { stroke: edgeColor, strokeWidth: 2 },
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
       });
     });
@@ -188,14 +222,110 @@ export function MindMap({ onSelectionChange, onApply, organization }: MindMapPro
     setNodes(newNodes);
     setEdges(newEdges);
 
-  }, [visibleGrantIds, availableGrants, setNodes, setEdges]);
+    // Send initial map state to server (first client becomes the "host")
+    if (wsRef?.current && wsRef.current.readyState === WebSocket.OPEN && !hasSentInitialSync.current) {
+      hasSentInitialSync.current = true;
+      // Small delay to ensure nodes are set first
+      setTimeout(() => {
+        const serializableNodes = newNodes.map(n => ({
+          id: n.id,
+          type: n.type,
+          position: n.position,
+          data: n.data,
+          style: n.style,
+        }));
+        wsRef.current?.send(JSON.stringify({
+          type: "map_sync",
+          nodes: serializableNodes,
+          edges: newEdges,
+        }));
+      }, 500);
+    }
+
+  }, [visibleGrantIds, availableGrants, setNodes, setEdges, syncedFromServer]);
+
+  // Listen for incoming WebSocket map messages
+  useEffect(() => {
+    if (!wsRef?.current) return;
+    const ws = wsRef.current;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        switch (data.type) {
+          case "node_move": {
+            isRemoteUpdate.current = true;
+            setNodes(prevNodes =>
+              prevNodes.map(n =>
+                n.id === data.nodeId ? { ...n, position: data.position } : n
+              )
+            );
+            // Reset flag after React processes the update
+            requestAnimationFrame(() => { isRemoteUpdate.current = false; });
+            break;
+          }
+
+          case "node_remove": {
+            setNodes(prevNodes => prevNodes.filter(n => n.id !== data.nodeId));
+            setEdges(prevEdges => prevEdges.filter(e => e.source !== data.nodeId && e.target !== data.nodeId));
+            setAvailableGrants(prev => prev.filter(g => g.id !== data.nodeId));
+            setVisibleGrantIds(prev => prev.filter(id => id !== data.nodeId));
+            if (selectedGrant?.id === data.nodeId) {
+              setSelectedGrant(null);
+            }
+            break;
+          }
+
+          case "map_sync": {
+            // Another client sent the full map state — adopt it
+            setSyncedFromServer(true);
+            isRemoteUpdate.current = true;
+            setNodes(data.nodes || []);
+            setEdges(data.edges || []);
+            requestAnimationFrame(() => { isRemoteUpdate.current = false; });
+            break;
+          }
+        }
+      } catch {
+        // Ignore non-JSON or unrelated messages
+      }
+    };
+
+    ws.addEventListener("message", handleMessage);
+    return () => ws.removeEventListener("message", handleMessage);
+  }, [wsRef?.current, setNodes, setEdges]);
+
+  // Also check init message for mapState (late joiner)
+  useEffect(() => {
+    if (!wsRef?.current) return;
+    const ws = wsRef.current;
+
+    const handleInit = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "init" && data.mapState) {
+          setSyncedFromServer(true);
+          isRemoteUpdate.current = true;
+          setNodes(data.mapState.nodes || []);
+          setEdges(data.mapState.edges || []);
+          requestAnimationFrame(() => { isRemoteUpdate.current = false; });
+        }
+      } catch {
+        // Ignore
+      }
+    };
+
+    ws.addEventListener("message", handleInit);
+    return () => ws.removeEventListener("message", handleInit);
+  }, [wsRef?.current, setNodes, setEdges]);
 
   return (
     <div className="w-full h-full bg-zinc-950 relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}

@@ -27,6 +27,28 @@ async function startServer() {
     ws: WebSocket;
   }
 
+  // Shared map state — nodes and edges synced across all clients
+  interface MapNode {
+    id: string;
+    type?: string;
+    position: { x: number; y: number };
+    data: Record<string, unknown>;
+    style?: Record<string, unknown>;
+  }
+  interface MapEdge {
+    id: string;
+    source: string;
+    target: string;
+    animated?: boolean;
+    style?: Record<string, unknown>;
+    label?: string;
+    labelStyle?: Record<string, unknown>;
+    labelBgStyle?: Record<string, unknown>;
+    markerEnd?: Record<string, unknown>;
+  }
+
+  let mapState: { nodes: MapNode[]; edges: MapEdge[] } | null = null;
+
   const users = new Map<string, User>();
   const messages: { user: string; text: string; timestamp: string; color: string }[] = [];
 
@@ -44,10 +66,13 @@ async function startServer() {
             currentUser = { id, name, color, x: 0, y: 0, ws };
             users.set(id, currentUser);
 
+            // Send init with users, messages, and current map state if available
             ws.send(JSON.stringify({
               type: "init",
+              userId: id,
               users: Array.from(users.values()).map(u => ({ id: u.id, name: u.name, color: u.color, x: u.x, y: u.y })),
-              messages
+              messages,
+              mapState
             }));
 
             broadcast({
@@ -83,6 +108,53 @@ async function startServer() {
               broadcast({ type: "chat_message", message: chatMsg });
             }
             break;
+
+          // --- Map collaboration messages ---
+
+          case "node_move": {
+            // A user dragged a node — broadcast new position and update server state
+            const { nodeId, position } = message;
+            if (mapState) {
+              const node = mapState.nodes.find(n => n.id === nodeId);
+              if (node) node.position = position;
+            }
+            broadcast({
+              type: "node_move",
+              nodeId,
+              position,
+              userId: currentUser?.id
+            }, ws);
+            break;
+          }
+
+          case "node_remove": {
+            // A user applied/removed a grant — broadcast removal and update server state
+            const { nodeId: removedId } = message;
+            if (mapState) {
+              mapState.nodes = mapState.nodes.filter(n => n.id !== removedId);
+              mapState.edges = mapState.edges.filter(e => e.source !== removedId && e.target !== removedId);
+            }
+            broadcast({
+              type: "node_remove",
+              nodeId: removedId,
+              userId: currentUser?.id
+            }, ws);
+            break;
+          }
+
+          case "map_sync": {
+            // A client is sending its full map state (first user sets the canonical state)
+            const { nodes, edges } = message;
+            mapState = { nodes, edges };
+            // Broadcast to all OTHER clients so they sync up
+            broadcast({
+              type: "map_sync",
+              nodes,
+              edges,
+              userId: currentUser?.id
+            }, ws);
+            break;
+          }
         }
       } catch (e) {
         console.error("WebSocket error:", e);
