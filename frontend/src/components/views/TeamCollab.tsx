@@ -1,8 +1,8 @@
 import { Users, MessageSquare, QrCode, MousePointer2, Send, Info, X, Zap } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MindMap } from "@/components/MindMap";
 import { ActiveMonitoringWidget } from "@/components/ActiveMonitoringWidget";
-import { ReactFlowProvider } from "@xyflow/react";
+import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { Organization } from "@/types";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -25,13 +25,17 @@ interface TeamCollabProps {
   organization: Organization;
 }
 
-export function TeamCollab({ organization }: TeamCollabProps) {
+/** Inner component that has access to ReactFlow context for coordinate conversion */
+function TeamCollabInner({ organization }: TeamCollabProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [myServerId, setMyServerId] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastCursorSend = useRef(0);
+  const reactFlowInstance = useReactFlow();
 
   useEffect(() => {
     // Connect to WebSocket (use VITE_WS_URL in dev when frontend and backend run on different ports)
@@ -61,6 +65,9 @@ export function TeamCollab({ organization }: TeamCollabProps) {
         case "init":
           setUsers(data.users);
           setMessages(data.messages);
+          if (data.userId) {
+            setMyServerId(data.userId);
+          }
           break;
         case "user_joined":
           setUsers(prev => [...prev, data.user]);
@@ -82,19 +89,30 @@ export function TeamCollab({ organization }: TeamCollabProps) {
     };
   }, []);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  // Send cursor position in flow coordinates, throttled to ~30ms
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !containerRef.current) return;
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const now = Date.now();
+    if (now - lastCursorSend.current < 30) return;
+    lastCursorSend.current = now;
 
-    wsRef.current.send(JSON.stringify({
-      type: "cursor",
-      x,
-      y
-    }));
-  };
+    try {
+      // Convert screen pixel position to flow (canvas) coordinates
+      const flowPosition = reactFlowInstance.screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      wsRef.current.send(JSON.stringify({
+        type: "cursor",
+        x: flowPosition.x,
+        y: flowPosition.y,
+      }));
+    } catch {
+      // reactFlowInstance may not be ready yet
+    }
+  }, [reactFlowInstance]);
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,6 +136,21 @@ export function TeamCollab({ organization }: TeamCollabProps) {
     setTimeout(() => setInviteCopied(false), 2000);
   };
 
+  // Convert flow coordinates to screen pixel position for rendering remote cursors
+  const getScreenPositionForCursor = useCallback((flowX: number, flowY: number) => {
+    try {
+      const screenPos = reactFlowInstance.flowToScreenPosition({ x: flowX, y: flowY });
+      if (!containerRef.current) return { x: screenPos.x, y: screenPos.y };
+      const rect = containerRef.current.getBoundingClientRect();
+      return {
+        x: screenPos.x - rect.left,
+        y: screenPos.y - rect.top,
+      };
+    } catch {
+      return { x: flowX, y: flowY };
+    }
+  }, [reactFlowInstance]);
+
   return (
     <div className="flex-1 bg-zinc-950 flex h-full overflow-hidden">
       {/* Main Canvas Area (Shared View) */}
@@ -127,9 +160,7 @@ export function TeamCollab({ organization }: TeamCollabProps) {
         className="flex-1 relative bg-zinc-950 flex flex-col border-r border-white/10 overflow-hidden cursor-crosshair"
       >
         <div className="flex-1 relative">
-          <ReactFlowProvider>
-            <MindMap organization={organization} />
-          </ReactFlowProvider>
+          <MindMap organization={organization} wsRef={wsRef} />
           
           {/* Floating Widget */}
           <div className="absolute top-4 left-4 z-10 pointer-events-none">
@@ -207,27 +238,30 @@ export function TeamCollab({ organization }: TeamCollabProps) {
           </AnimatePresence>
         </div>
 
-        {/* Cursors */}
+        {/* Cursors — rendered using flow-to-screen coordinate conversion */}
         {users.map(user => (
-          user.id !== currentUser?.id && (
-            <div 
-              key={user.id}
-              className="absolute pointer-events-none transition-all duration-100 ease-linear z-50"
-              style={{ left: user.x, top: user.y }}
-            >
-              <MousePointer2 
-                className="transform -rotate-12 drop-shadow-md" 
-                size={24} 
-                style={{ color: user.color, fill: user.color }}
-              />
+          user.id !== myServerId && (() => {
+            const pos = getScreenPositionForCursor(user.x, user.y);
+            return (
               <div 
-                className="text-white text-[10px] px-1.5 py-0.5 rounded ml-4 mt-1 whitespace-nowrap shadow-sm font-bold"
-                style={{ backgroundColor: user.color }}
+                key={user.id}
+                className="absolute pointer-events-none transition-all duration-75 ease-linear z-50"
+                style={{ left: pos.x, top: pos.y }}
               >
-                {user.name}
+                <MousePointer2 
+                  className="transform -rotate-12 drop-shadow-md" 
+                  size={24} 
+                  style={{ color: user.color, fill: user.color }}
+                />
+                <div 
+                  className="text-white text-[10px] px-1.5 py-0.5 rounded ml-4 mt-1 whitespace-nowrap shadow-sm font-bold"
+                  style={{ backgroundColor: user.color }}
+                >
+                  {user.name}
+                </div>
               </div>
-            </div>
-          )
+            );
+          })()
         ))}
       </div>
 
@@ -315,5 +349,14 @@ export function TeamCollab({ organization }: TeamCollabProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Wrapper that provides the ReactFlowProvider context */
+export function TeamCollab({ organization }: TeamCollabProps) {
+  return (
+    <ReactFlowProvider>
+      <TeamCollabInner organization={organization} />
+    </ReactFlowProvider>
   );
 }
