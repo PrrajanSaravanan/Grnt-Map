@@ -30,3 +30,16 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+#Python venv 
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.env/
+.venv/
