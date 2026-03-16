@@ -15,6 +15,7 @@ import { Settings } from "@/components/views/Settings";
 import { ApplicationBuilder } from "@/components/views/ApplicationBuilder";
 import { MyApplications } from "@/components/views/MyApplications";
 import { Login } from "@/components/views/Login";
+import { GrantSimulatedFlow } from "@/components/views/GrantSimulatedFlow";
 import { ReactFlowProvider } from "@xyflow/react";
 import { ActiveMonitoringWidget } from "@/components/ActiveMonitoringWidget";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
@@ -86,6 +87,20 @@ export default function App() {
       setIsAuthenticated(true);
       setHasOnboarded(true);
       setCurrentView("collab");
+    } else if (params.get("view") === "grant-sim") {
+      setIsAuthenticated(true);
+      setHasOnboarded(true);
+      // Hydrate selected grant from localStorage for the simulated tab
+      try {
+        const stored = localStorage.getItem("tinyfish:lastGrant");
+        if (stored) {
+          const parsed = JSON.parse(stored) as Grant;
+          setSelectedGrantForBuilder(parsed);
+        }
+      } catch {
+        // ignore JSON errors in demo
+      }
+      setCurrentView("grant-sim");
     }
   }, []);
 
@@ -122,8 +137,15 @@ export default function App() {
       };
       setMyApplications(prev => [newApplication, ...prev]);
     }
-    // Open builder for this grant
-    handleOpenBuilder(grant);
+    // Store selected grant so a new tab can pick it up
+    try {
+      localStorage.setItem("tinyfish:lastGrant", JSON.stringify(grant));
+    } catch {
+      // ignore storage errors in demo
+    }
+    // Open simulated Grants.gov view in a completely new tab
+    const url = `${window.location.origin}?view=grant-sim`;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const handleUpdateApplicationStatus = (grantId: string, status: string, progress: number) => {
@@ -138,6 +160,19 @@ export default function App() {
 
   if (!hasOnboarded && currentView === "onboarding") {
     return <Onboarding userId={userId} onComplete={handleOnboardingComplete} />;
+  }
+
+  // Special minimal layout for simulated Grants.gov tab: no sidebar or app chrome
+  if (currentView === "grant-sim") {
+    return (
+      <div className="flex h-screen w-screen bg-white text-zinc-900 overflow-hidden">
+        <GrantSimulatedFlow
+          grant={selectedGrantForBuilder}
+          organization={organizationProfile}
+          onBack={() => window.close()}
+        />
+      </div>
+    );
   }
 
   return (
