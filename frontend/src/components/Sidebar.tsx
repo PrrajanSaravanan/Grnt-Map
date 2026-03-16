@@ -6,9 +6,10 @@ interface SidebarProps {
   currentView: string;
   onNavigate: (view: string) => void;
   organization?: Organization;
+  userName?: string;
 }
 
-export function Sidebar({ currentView, onNavigate, organization }: SidebarProps) {
+export function Sidebar({ currentView, onNavigate, organization, userName }: SidebarProps) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "applications", label: "My Applications", icon: PenTool },
@@ -33,8 +34,8 @@ export function Sidebar({ currentView, onNavigate, organization }: SidebarProps)
             </div>
           </div>
           <div>
-            <h3 className="font-semibold text-white text-sm">{organization?.name || "EcoYouth Nonprofit"}</h3>
-            <p className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">Verified • Pro</p>
+            <h3 className="font-semibold text-white text-sm">{userName || organization?.name || "My Organization"}</h3>
+            <p className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">Verified • {organization?.type || "Nonprofit"}</p>
           </div>
         </div>
       </div>

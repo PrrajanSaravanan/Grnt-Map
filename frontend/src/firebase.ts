@@ -105,6 +105,7 @@ export interface UserProfile {
   email?: string;
   organizationName?: string;
   organizationType?: string;
+  type?: string;
   country?: string;
   mission?: string;
   focusAreas?: string[];

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Shield, Database, Key, ToggleLeft, ToggleRight, FileDown } from "lucide-react";
+import { Shield, Database, FileDown } from "lucide-react";
 import { Organization } from "@/types";
 import { auth, getCurrentUserProfile } from "@/firebase";
 import { downloadProfilePdf } from "@/lib/profilePdf";
@@ -11,6 +11,10 @@ interface SettingsProps {
 export function Settings({ organization }: SettingsProps) {
   const [profilePdfLoading, setProfilePdfLoading] = useState(false);
   const [profilePdfError, setProfilePdfError] = useState<string | null>(null);
+
+  // Privacy toggle states
+  const [encryptionEnabled, setEncryptionEnabled] = useState(true);
+  const [benchmarkEnabled, setBenchmarkEnabled] = useState(false);
 
   const handleDownloadProfilePdf = async () => {
     const user = auth.currentUser;
@@ -34,8 +38,6 @@ export function Settings({ organization }: SettingsProps) {
     }
   };
 
-  const orgSlug = (organization?.name || "tinyfish").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const apiKey = `sk_live_${orgSlug}_${Math.floor(Math.random() * 1000000000)}`;
   const checkpointId = Math.floor(Math.random() * 1000) + 500;
   const records = Math.floor(Math.random() * 100) + 20;
 
@@ -114,33 +116,7 @@ export function Settings({ organization }: SettingsProps) {
             </div>
           </section>
 
-          {/* API Keys */}
-          <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                <Key className="text-emerald-400" size={24} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-white mb-1">TinyFish API Configuration</h3>
-                <p className="text-sm text-zinc-400 mb-4">Connect your custom agent swarms via API.</p>
-                
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={apiKey}
-                    readOnly
-                    aria-label="API key"
-                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400 font-mono"
-                  />
-                  <button className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors">
-                    Rotate Key
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Privacy */}
+          {/* Privacy & Encryption */}
           <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
@@ -156,14 +132,40 @@ export function Settings({ organization }: SettingsProps) {
                       <div className="text-white text-sm font-medium">End-to-End Encryption</div>
                       <div className="text-zinc-500 text-xs">Encrypt all grant data before storage</div>
                     </div>
-                    <ToggleRight className="text-emerald-500 cursor-pointer" size={32} />
+                    <button
+                      onClick={() => setEncryptionEnabled(!encryptionEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none ${
+                        encryptionEnabled ? "bg-emerald-500" : "bg-zinc-700"
+                      }`}
+                      role="switch"
+                      aria-checked={encryptionEnabled}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${
+                          encryptionEnabled ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-white text-sm font-medium">Allow Anonymous Benchmarking</div>
                       <div className="text-zinc-500 text-xs">Contribute to global grant stats anonymously</div>
                     </div>
-                    <ToggleLeft className="text-zinc-600 cursor-pointer" size={32} />
+                    <button
+                      onClick={() => setBenchmarkEnabled(!benchmarkEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none ${
+                        benchmarkEnabled ? "bg-emerald-500" : "bg-zinc-700"
+                      }`}
+                      role="switch"
+                      aria-checked={benchmarkEnabled}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${
+                          benchmarkEnabled ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
               </div>
