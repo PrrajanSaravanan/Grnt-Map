@@ -29,9 +29,10 @@ interface MindMapProps {
   onApply?: (grant: Grant) => void;
   organization: Organization;
   wsRef?: React.MutableRefObject<WebSocket | null>;
+  searchQuery?: string;
 }
 
-export function MindMap({ onSelectionChange, onApply, organization, wsRef }: MindMapProps) {
+export function MindMap({ onSelectionChange, onApply, organization, wsRef, searchQuery }: MindMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedGrant, setSelectedGrant] = useState<Grant | null>(null);
@@ -45,18 +46,27 @@ export function MindMap({ onSelectionChange, onApply, organization, wsRef }: Min
   useEffect(() => {
     const fetchGrants = async () => {
       setLoading(true);
+      setSyncedFromServer(false);
+      hasSentInitialSync.current = false;
       
-      // Construct query from organization profile
-      const focus = organization.focusAreas?.join(", ") || "general non-profit";
-      const query = `${focus} grants for ${organization.mission}`;
+      // Use search query if provided, otherwise construct from org profile
+      let query: string;
+      if (searchQuery) {
+        query = searchQuery;
+      } else {
+        const focus = organization.focusAreas?.join(", ") || "general non-profit";
+        query = `${focus} grants for ${organization.mission}`;
+      }
       
       console.log("Generating grants for query:", query);
       const grants = await generateGrants(query);
       setAvailableGrants(grants);
+      setVisibleGrantIds([]);
+      setSelectedGrant(null);
       setLoading(false);
     };
     fetchGrants();
-  }, [organization]); // Re-run if organization changes
+  }, [organization, searchQuery]); // Re-run on org change or new search
 
   useEffect(() => {
     onSelectionChange?.(!!selectedGrant);

@@ -23,13 +23,13 @@ import { auth, getCurrentUserProfile } from "@/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 const DEFAULT_ORG: Organization = {
-  name: "EcoYouth Nonprofit",
-  mission: "To empower underrepresented youth through climate education and sustainable community projects in urban areas.",
-  pastGrants: ["Urban Garden Initiative 2024", "Youth Climate Leaders Fellowship"],
-  focusAreas: ["Climate", "Education"],
-  minGrant: "$50k",
-  maxGrant: "$150k",
-  regions: ["United States"],
+  name: "My Organization",
+  mission: "",
+  pastGrants: [],
+  focusAreas: [],
+  minGrant: "",
+  maxGrant: "",
+  regions: [],
   type: "Nonprofit"
 };
 
@@ -43,6 +43,8 @@ export default function App() {
   const [selectedGrantForBuilder, setSelectedGrantForBuilder] = useState<Grant | null>(null);
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [organizationProfile, setOrganizationProfile] = useState<Organization>(DEFAULT_ORG);
+  const [userFullName, setUserFullName] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setUserId(user?.uid ?? null));
@@ -53,7 +55,10 @@ export default function App() {
   useEffect(() => {
     if (!userId) return;
     getCurrentUserProfile(userId).then((profile) => {
-      if (!profile?.onboardingCompleted) return;
+      if (!profile) return;
+      // Always set user's full name regardless of onboarding status
+      if (profile.fullName) setUserFullName(profile.fullName);
+      if (!profile.onboardingCompleted) return;
       const fn = profile.fundingNeeds;
       const oc = profile.operationalContext;
       const formatGrant = (n: number) =>
@@ -142,6 +147,7 @@ export default function App() {
         currentView={currentView} 
         onNavigate={setCurrentView} 
         organization={organizationProfile}
+        userName={userFullName}
       />
 
       {/* Main Content Area */}
@@ -150,6 +156,11 @@ export default function App() {
         <Header 
           onNotificationClick={() => setIsNotificationOpen(true)} 
           organization={organizationProfile}
+          userName={userFullName}
+          onSearch={(query) => {
+            setSearchQuery(query);
+            setCurrentView("dashboard");
+          }}
         />
 
         {/* Middle Section: Canvas/View + Right Panel */}
@@ -164,6 +175,7 @@ export default function App() {
                       onSelectionChange={setIsGrantSelected} 
                       onApply={handleApplyToGrant}
                       organization={organizationProfile}
+                      searchQuery={searchQuery}
                     />
                   </ReactFlowProvider>
                   
@@ -203,7 +215,7 @@ export default function App() {
         </div>
 
         {/* Notification Drawer Overlay */}
-        <NotificationDrawer isOpen={isNotificationOpen} onClose={() => setIsNotificationOpen(false)} />
+        <NotificationDrawer isOpen={isNotificationOpen} onClose={() => setIsNotificationOpen(false)} organization={organizationProfile} />
       </div>
     </div>
   );
