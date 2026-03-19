@@ -818,22 +818,6 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                 </h1>
                 <p className="text-xs text-zinc-600 mt-1">{grant.title}</p>
               </div>
-              <div className="text-xs text-zinc-600 text-right">
-                <div>
-                  Funding request:{" "}
-                  <span className="font-mono text-emerald-600">
-                    {budgetDefault}
-                  </span>
-                </div>
-                <div>
-                  Program category:{" "}
-                  <span className="font-mono text-blue-600">
-                    {organization.focusAreas?.length
-                      ? organization.focusAreas.join(" · ")
-                      : grant.type || primaryFocus}
-                  </span>
-                </div>
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
