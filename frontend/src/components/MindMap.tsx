@@ -50,6 +50,18 @@ export function MindMap({ onSelectionChange, onApply, organization, wsRef, searc
       hasSentInitialSync.current = false;
       
       // Use search query if provided, otherwise construct from org profile
+      // Also use matchedGrants from org profile if no search query provided
+      console.log("[MindMap] fetchGrants called with searchQuery:", searchQuery, "organization.matchedGrants:", organization.matchedGrants?.length);
+      if (!searchQuery && organization.matchedGrants && organization.matchedGrants.length > 0) {
+        console.log("[MindMap] Using matched grants from profile");
+        setAvailableGrants(organization.matchedGrants);
+        setVisibleGrantIds([]);
+        setSelectedGrant(null);
+        setLoading(false);
+        return;
+      }
+
+      console.log("[MindMap] Falling back to generateGrants");
       let query: string;
       if (searchQuery) {
         query = searchQuery;

@@ -76,6 +76,7 @@ export interface OnboardingPayload {
   organizationName?: string | null;
   type?: string | null;
   country?: string | null;
+  matchedGrants?: any[];
 }
 
 export async function updateUserOnboarding(userId: string, data: OnboardingPayload) {
@@ -96,6 +97,7 @@ export async function updateUserOnboarding(userId: string, data: OnboardingPaylo
   if (data.organizationName != null && data.organizationName !== "") payload.organizationName = data.organizationName;
   if (data.type != null && data.type !== "") payload.type = data.type;
   if (data.country != null && data.country !== "") payload.country = data.country;
+  if (data.matchedGrants !== undefined) payload.matchedGrants = data.matchedGrants;
   await updateDoc(userRef, payload);
 }
 
@@ -123,6 +125,7 @@ export interface UserProfile {
   };
   pitchDocText?: string | null;
   onboardingCompleted?: boolean;
+  matchedGrants?: any[];
   createdAt?: string;
   updatedAt?: unknown;
 }

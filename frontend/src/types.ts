@@ -33,4 +33,5 @@ export interface Organization {
   yearsOperating?: string;
   internationalEligible?: boolean;
   type?: string;
+  matchedGrants?: Grant[];
 }

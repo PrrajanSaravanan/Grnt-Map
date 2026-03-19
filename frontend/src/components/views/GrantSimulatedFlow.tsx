@@ -15,6 +15,88 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
   const [showHelp, setShowHelp] = useState(false);
   const [helpSection, setHelpSection] = useState<string>("Get Started");
 
+  // Simulation state
+  const [orgName, setOrgName] = useState("");
+  const [category, setCategory] = useState("");
+  const [mission, setMission] = useState("");
+  const [budget, setBudget] = useState("");
+  const [contact, setContact] = useState("");
+  const [activityLogs, setActivityLogs] = useState<string[]>([]);
+
+  const primaryFocus =
+    organization?.focusAreas && organization.focusAreas.length > 0
+      ? organization.focusAreas[0]
+      : "Community Development";
+
+  const budgetDefault =
+    organization?.minGrant && organization?.maxGrant
+      ? `${organization.minGrant} – ${organization.maxGrant}`
+      : grant?.amount || "$75,000 – $120,000";
+
+  const targetCategory = organization?.focusAreas?.length
+      ? organization.focusAreas.join(" · ")
+      : grant?.type || primaryFocus;
+  const targetContact = `${organization?.name || ''} · info@demo.org · (555) 555-0182`;
+
+  React.useEffect(() => {
+    if (step !== "form") {
+      setActivityLogs([]);
+      setOrgName("");
+      setCategory("");
+      setMission("");
+      setBudget("");
+      setContact("");
+      return;
+    }
+    
+    let isSubscribed = true;
+    
+    const simulate = async () => {
+      const typeText = async (setText: React.Dispatch<React.SetStateAction<string>>, text: string) => {
+        if (!text) return;
+        for (let i = 0; i <= text.length; i++) {
+          if (!isSubscribed) return;
+          setText(text.substring(0, i));
+          await new Promise(r => setTimeout(r, 15)); // fast typing speed
+        }
+      };
+
+      const addLog = async (msg: string) => {
+        if (!isSubscribed) return;
+        setActivityLogs(prev => [...prev, msg]);
+        await new Promise(r => setTimeout(r, 800)); // simulated thinking/processing
+      };
+
+      await new Promise(r => setTimeout(r, 500)); // initial delay
+      await addLog("Loading organization profile…");
+      await addLog("Fetching grant template…");
+      await addLog("Mapping profile → form fields…");
+      
+      await addLog("Typing: Organization name");
+      await typeText(setOrgName, organization?.name || "");
+      
+      await addLog("Typing: Program category");
+      await typeText(setCategory, targetCategory);
+      
+      await addLog("Typing: Mission statement");
+      await typeText(setMission, organization?.mission || "");
+      
+      await addLog("Typing: Funding request");
+      await typeText(setBudget, budgetDefault);
+      
+      await addLog("Typing: Contact details");
+      await typeText(setContact, targetContact);
+
+      await addLog("Checking impact description…");
+      await addLog("Field not in profile — flagging for human input");
+      await addLog("Calculating completion…");
+    };
+
+    simulate();
+
+    return () => { isSubscribed = false; };
+  }, [step, organization?.name, targetCategory, organization?.mission, budgetDefault, targetContact]);
+
   if (!grant) {
     return (
       <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center text-zinc-500">
@@ -28,11 +110,6 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
       </div>
     );
   }
-
-  const primaryFocus =
-    organization.focusAreas && organization.focusAreas.length > 0
-      ? organization.focusAreas[0]
-      : "Community Development";
 
   if (step === "portal") {
     // Full-page Grants.gov-style replica
@@ -50,7 +127,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
             <div className="flex items-center gap-3">
               {/* Use the provided Grants.gov logo. Place the image as public/grants-gov-logo.png */}
               <img
-                src="/grants-gov-logo.png"
+                src="/grants-gov-logo.jpeg"
                 alt="Grants.gov"
                 className="h-10 w-auto"
               />
@@ -656,7 +733,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
           <div className="bg-blue-900 text-white px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <img
-                src="/grants-gov-logo.png"
+                src="/grants-gov-logo.jpeg"
                 alt="Grants.gov"
                 className="h-6 w-auto"
               />
@@ -669,10 +746,6 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
   }
 
   // Step 2: Grants.gov-style application form with agent log
-  const budgetDefault =
-    organization.minGrant && organization.maxGrant
-      ? `${organization.minGrant} – ${organization.maxGrant}`
-      : grant.amount || "$75,000 – $120,000";
 
   return (
     <div className="flex-1 bg-white flex flex-col h-full overflow-auto text-zinc-900">
@@ -689,7 +762,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
         <div className="max-w-6xl mx-auto flex items-center justify-between py-3 px-6">
           <div className="flex items-center gap-3">
             <img
-              src="/grants-gov-logo.png"
+              src="/grants-gov-logo.jpeg"
               alt="Grants.gov"
               className="h-10 w-auto"
             />
@@ -721,24 +794,18 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
               Agent Activity
             </h2>
             <ul className="space-y-2">
-              {[
-                "Loading organization profile…",
-                "Fetching grant template…",
-                "Mapping profile → form fields…",
-                "Typing: Organization name",
-                "Typing: Mission statement",
-                "Typing: Funding request",
-                "Typing: Program category",
-                "Checking impact description…",
-                "Field not in profile — flagging for human input",
-                "Typing: Contact details",
-                "Calculating completion…",
-              ].map((msg, i) => (
-                <li key={i} className="flex items-start gap-2">
+              {activityLogs.map((msg, i) => (
+                <li key={i} className="flex items-start gap-2 animate-in slide-in-from-left fade-in duration-300">
                   <span className="mt-0.5 text-emerald-500">✓</span>
                   <span>{msg}</span>
                 </li>
               ))}
+              {activityLogs.length < 11 && activityLogs.length > 0 && (
+                <li className="flex items-start gap-2 text-zinc-400">
+                  <Loader2 className="animate-spin mt-0.5" size={14} />
+                  <span>Agent is working...</span>
+                </li>
+              )}
             </ul>
           </aside>
 
@@ -776,7 +843,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                 </label>
                 <input
                   type="text"
-                  defaultValue={organization.name}
+                  value={orgName}
+                  onChange={() => {}}
                   className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
                   placeholder="Enter organization name"
                 />
@@ -787,11 +855,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                 </label>
                 <input
                   type="text"
-                  defaultValue={
-                    organization.focusAreas?.length
-                      ? organization.focusAreas.join(" · ")
-                      : grant.type || "Community Health · Social Services"
-                  }
+                  value={category}
+                  onChange={() => {}}
                   className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
                   placeholder="Enter program category"
                 />
@@ -804,7 +869,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
               </label>
               <textarea
                 rows={3}
-                defaultValue={organization.mission}
+                value={mission}
+                onChange={() => {}}
                 className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
                 placeholder="Enter mission statement"
               />
@@ -817,7 +883,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                 </label>
                 <input
                   type="text"
-                  defaultValue={budgetDefault}
+                  value={budget}
+                  onChange={() => {}}
                   className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm font-mono"
                   placeholder="Enter requested amount"
                 />
@@ -828,7 +895,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                 </label>
                 <input
                   type="text"
-                  defaultValue={`${organization.name} · info@demo.org · (555) 555-0182`}
+                  value={contact}
+                  onChange={() => {}}
                   className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
                   placeholder="Enter contact details"
                 />
@@ -901,7 +969,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
         <div className="bg-blue-900 text-white px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img
-              src="/grants-gov-logo.png"
+              src="/grants-gov-logo.jpeg"
               alt="Grants.gov"
               className="h-6 w-auto"
             />

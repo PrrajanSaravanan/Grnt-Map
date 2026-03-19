@@ -56,10 +56,14 @@ export default function App() {
   useEffect(() => {
     if (!userId) return;
     getCurrentUserProfile(userId).then((profile) => {
+      console.log("[App] Fetched user profile:", profile);
       if (!profile) return;
       // Always set user's full name regardless of onboarding status
       if (profile.fullName) setUserFullName(profile.fullName);
-      if (!profile.onboardingCompleted) return;
+      if (!profile.onboardingCompleted) {
+        console.log("[App] Onboarding not completed");
+        return;
+      }
       const fn = profile.fundingNeeds;
       const oc = profile.operationalContext;
       const formatGrant = (n: number) =>
@@ -77,6 +81,7 @@ export default function App() {
         yearsOperating: oc?.yearsOperating != null ? String(oc.yearsOperating) : prev.yearsOperating,
         internationalEligible: oc?.internationalEligibility ?? prev.internationalEligible,
         type: profile.organizationType ?? profile.type ?? prev.type,
+        matchedGrants: profile.matchedGrants ?? prev.matchedGrants,
       }));
     });
   }, [userId]);
