@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 import { Grant, Organization } from "@/types";
 import { generateApplicationContent } from "@/services/ai";
 
-export function ApplicationBuilder({ 
-  onBack, 
+export function ApplicationBuilder({
+  onBack,
   grant,
   onUpdateStatus,
   organization
-}: { 
-  onBack: () => void; 
+}: {
+  onBack: () => void;
   grant: Grant | null;
   onUpdateStatus?: (grantId: string, status: string, progress: number) => void;
   organization: Organization;
@@ -68,12 +68,12 @@ export function ApplicationBuilder({
         setLoading(false);
       } else {
         // Fallback or empty state if no grant selected (shouldn't happen in this flow)
-         setContent({
-            overview: organization.name,
-            mission: organization.mission,
-            budget: "",
-            impact: ""
-         });
+        setContent({
+          overview: organization.name,
+          mission: organization.mission,
+          budget: "",
+          impact: ""
+        });
       }
     };
     fetchContent();
@@ -99,12 +99,12 @@ export function ApplicationBuilder({
   };
 
   if (!grant && !loading) {
-      return (
-          <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center text-zinc-500">
-              <p>No grant selected. Please go back and select a grant.</p>
-              <button onClick={onBack} className="mt-4 text-emerald-500 hover:underline">Back to Applications</button>
-          </div>
-      )
+    return (
+      <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center text-zinc-500">
+        <p>No grant selected. Please go back and select a grant.</p>
+        <button onClick={onBack} className="mt-4 text-emerald-500 hover:underline">Back to Applications</button>
+      </div>
+    )
   }
 
   return (
@@ -127,12 +127,12 @@ export function ApplicationBuilder({
               <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
-          
+
           {progress === 100 ? (
-             <button 
-               onClick={handleApply}
-               className="flex items-center gap-2 px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all hover:scale-105 animate-pulse"
-             >
+            <button
+              onClick={handleApply}
+              className="flex items-center gap-2 px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all hover:scale-105 animate-pulse"
+            >
               <Send size={16} /> Apply Now
             </button>
           ) : (
@@ -146,18 +146,18 @@ export function ApplicationBuilder({
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-5xl mx-auto grid grid-cols-12 gap-8">
-          
+
           {/* Sidebar Navigation */}
           <div className="col-span-3 space-y-2">
             <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Sections</h3>
             {sections.map((section) => (
-              <button 
+              <button
                 key={section.id}
                 onClick={() => toggleSection(section.id)} // For demo purposes, clicking toggles completion
                 className={cn(
                   "w-full flex items-center justify-between p-3 rounded-lg text-sm font-medium transition-colors border",
-                  section.completed 
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                  section.completed
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                     : "bg-zinc-900 text-zinc-400 border-white/5 hover:bg-zinc-800"
                 )}
               >
@@ -181,99 +181,99 @@ export function ApplicationBuilder({
             </div>
 
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
-                    <Loader2 className="animate-spin mb-4 text-emerald-500" size={32} />
-                    <p>Generating application content with TinyFish...</p>
-                </div>
+              <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
+                <Loader2 className="animate-spin mb-4 text-emerald-500" size={32} />
+                <p>Generating application content with TinyFish...</p>
+              </div>
             ) : (
-                <div className="space-y-6">
+              <div className="space-y-6">
                 <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
-                    <h3 className="text-lg font-medium text-white mb-4">Organization Overview</h3>
-                    <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-white mb-4">Organization Overview</h3>
+                  <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Legal Name</label>
-                        <input type="text" defaultValue={organization.name} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" />
+                      <label className="block text-sm font-medium text-zinc-400 mb-1.5">Legal Name</label>
+                      <input type="text" defaultValue={organization.name} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Mission Statement</label>
-                        <textarea 
-                        rows={3} 
+                      <label className="block text-sm font-medium text-zinc-400 mb-1.5">Mission Statement</label>
+                      <textarea
+                        rows={3}
                         value={content.mission}
-                        onChange={(e) => setContent({...content, mission: e.target.value})}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" 
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Overview for this Grant</label>
-                        <textarea 
-                        rows={4} 
-                        value={content.overview}
-                        onChange={(e) => setContent({...content, overview: e.target.value})}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" 
-                        />
-                    </div>
-                    </div>
-                </section>
-
-                <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
-                    <h3 className="text-lg font-medium text-white mb-4">Project Details</h3>
-                    <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Project Title</label>
-                        <input type="text" defaultValue={grant?.title} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Budget Request</label>
-                        <textarea 
-                            rows={3}
-                            value={content.budget} 
-                            onChange={(e) => setContent({...content, budget: e.target.value})}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none font-mono" 
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Impact Goals</label>
-                        <textarea 
-                        rows={4} 
-                        value={content.impact}
-                        onChange={(e) => setContent({...content, impact: e.target.value})}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none font-mono text-sm" 
-                        />
-                    </div>
-                    </div>
-                </section>
-
-                <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
-                    <h3 className="text-lg font-medium text-white mb-4">Attachments</h3>
-                    <div className="border-2 border-dashed border-zinc-800 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-zinc-700 transition-colors cursor-pointer relative">
-                      <input 
-                        type="file" 
-                        multiple 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onChange={handleFileUpload}
+                        onChange={(e) => setContent({ ...content, mission: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none"
                       />
-                      <Paperclip className="text-zinc-500 mb-2" />
-                      <p className="text-sm text-zinc-400">Click or drag and drop supporting documents</p>
-                      <p className="text-xs text-zinc-600 mt-1">PDF, DOCX up to 10MB</p>
                     </div>
-                    <div className="mt-4 space-y-2">
-                      {files.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg border border-white/5">
-                            <div className="flex items-center gap-3">
-                            <FileText size={16} className="text-emerald-500" />
-                            <span className="text-sm text-zinc-300">{file.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-zinc-500">{file.size}</span>
-                              {file.size !== "Auto-attached" && (
-                                <button onClick={() => removeFile(file.name)} className="text-zinc-600 hover:text-red-400">×</button>
-                              )}
-                            </div>
-                        </div>
-                      ))}
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1.5">Overview for this Grant</label>
+                      <textarea
+                        rows={4}
+                        value={content.overview}
+                        onChange={(e) => setContent({ ...content, overview: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none"
+                      />
                     </div>
+                  </div>
                 </section>
-                </div>
+
+                <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
+                  <h3 className="text-lg font-medium text-white mb-4">Project Details</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1.5">Project Title</label>
+                      <input type="text" defaultValue={grant?.title} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1.5">Budget Request</label>
+                      <textarea
+                        rows={3}
+                        value={content.budget}
+                        onChange={(e) => setContent({ ...content, budget: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1.5">Impact Goals</label>
+                      <textarea
+                        rows={4}
+                        value={content.impact}
+                        onChange={(e) => setContent({ ...content, impact: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
+                  <h3 className="text-lg font-medium text-white mb-4">Attachments</h3>
+                  <div className="border-2 border-dashed border-zinc-800 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-zinc-700 transition-colors cursor-pointer relative">
+                    <input
+                      type="file"
+                      multiple
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={handleFileUpload}
+                    />
+                    <Paperclip className="text-zinc-500 mb-2" />
+                    <p className="text-sm text-zinc-400">Click or drag and drop supporting documents</p>
+                    <p className="text-xs text-zinc-600 mt-1">PDF, DOCX up to 10MB</p>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {files.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg border border-white/5">
+                        <div className="flex items-center gap-3">
+                          <FileText size={16} className="text-emerald-500" />
+                          <span className="text-sm text-zinc-300">{file.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-zinc-500">{file.size}</span>
+                          {file.size !== "Auto-attached" && (
+                            <button onClick={() => removeFile(file.name)} className="text-zinc-600 hover:text-red-400">×</button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
             )}
           </div>
         </div>

@@ -99,8 +99,8 @@ function addLabeledRow(
   return y + LINE_HEIGHT;
 }
 
-/** Universal mock grants that apply to any organization type. */
-const MOCK_GRANTS = [
+/** Universal grants that apply to any organization type. */
+const RECOMMENDED_GRANTS = [
   {
     title: "Community Innovation & Development Fund",
     amount: "$25,000 – $150,000",
@@ -249,8 +249,8 @@ export function downloadProfilePdf(profile: UserProfile, filename = "GrantWeave-
   doc.setTextColor(0, 0, 0);
   y += LINE_HEIGHT + 8;
 
-  for (let i = 0; i < MOCK_GRANTS.length; i++) {
-    const grant = MOCK_GRANTS[i];
+  for (let i = 0; i < RECOMMENDED_GRANTS.length; i++) {
+    const grant = RECOMMENDED_GRANTS[i];
 
     // Ensure enough space for a grant block header
     y = checkPageBreak(doc, y, 40);

@@ -95,7 +95,7 @@ export default function App() {
     } else if (params.get("view") === "grant-sim") {
       setIsAuthenticated(true);
       setHasOnboarded(true);
-      // Hydrate selected grant from localStorage for the simulated tab
+      // Hydrate selected grant from localStorage for the portal tab
       try {
         const stored = localStorage.getItem("tinyfish:lastGrant");
         if (stored) {
@@ -103,7 +103,7 @@ export default function App() {
           setSelectedGrantForBuilder(parsed);
         }
       } catch {
-        // ignore JSON errors in demo
+        // ignore JSON errors
       }
       setCurrentView("grant-sim");
     }
@@ -146,9 +146,9 @@ export default function App() {
     try {
       localStorage.setItem("tinyfish:lastGrant", JSON.stringify(grant));
     } catch {
-      // ignore storage errors in demo
+      // ignore storage errors
     }
-    // Open simulated Grants.gov view in a completely new tab
+    // Open Grants.gov view in a new tab
     const url = `${window.location.origin}?view=grant-sim`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -167,7 +167,7 @@ export default function App() {
     return <Onboarding userId={userId} onComplete={handleOnboardingComplete} />;
   }
 
-  // Special minimal layout for simulated Grants.gov tab: no sidebar or app chrome
+  // Minimal layout for Grants.gov portal tab: no sidebar or app chrome
   if (currentView === "grant-sim") {
     return (
       <div className="flex h-screen w-screen bg-white text-zinc-900 overflow-hidden">

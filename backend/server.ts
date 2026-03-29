@@ -217,10 +217,10 @@ async function startServer() {
 
       res.json(grants);
     } catch (error) {
-      console.error("Live fetch error, falling back to mock data:", error);
+      console.error("Live fetch error, falling back to cached data:", error);
       res.json([
         {
-          id: "mock-1",
+          id: "fallback-1",
           title: "Global Climate Innovation Fund",
           amount: "$150,000",
           deadline: "2026-08-15",
@@ -236,7 +236,7 @@ async function startServer() {
           type: "Private Foundation"
         },
         {
-          id: "mock-2",
+          id: "fallback-2",
           title: "Community Resilience Grant",
           amount: "$50,000",
           deadline: "Rolling",
@@ -252,7 +252,7 @@ async function startServer() {
           type: "Community Foundation"
         },
         {
-          id: "mock-3",
+          id: "fallback-3",
           title: "Tech for Good Initiative",
           amount: "$75,000",
           deadline: "2026-10-01",

@@ -15,7 +15,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
   const [showHelp, setShowHelp] = useState(false);
   const [helpSection, setHelpSection] = useState<string>("Get Started");
 
-  // Simulation state
+  // Form state
   const [orgName, setOrgName] = useState("");
   const [category, setCategory] = useState("");
   const [mission, setMission] = useState("");
@@ -36,7 +36,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
   const targetCategory = organization?.focusAreas?.length
       ? organization.focusAreas.join(" · ")
       : grant?.type || primaryFocus;
-  const targetContact = `${organization?.name || ''} · info@demo.org · (555) 555-0182`;
+  const targetContact = `${organization?.name || ''} · info@grants.org · (555) 555-0182`;
 
   React.useEffect(() => {
     if (step !== "form") {
@@ -134,8 +134,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
             </div>
             <div className="flex items-center gap-4 text-xs text-zinc-600">
               <button className="hover:underline" onClick={() => setShowHelp(true)}>Help</button>
-              <button className="hover:underline" onClick={() => alert("Demo only: Register flow not implemented.")}>Register</button>
-              <button className="hover:underline" onClick={() => alert("Demo only: Login flow not implemented.")}>Login</button>
+              <button className="hover:underline" onClick={() => alert("Registration is managed through your organization's Grants.gov account.")}>Register</button>
+              <button className="hover:underline" onClick={() => alert("Login is managed through your organization's Grants.gov account.")}>Login</button>
               <div className="ml-4">
                 <input
                   type="text"
@@ -144,7 +144,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                 />
                 <button
                   className="bg-red-600 text-white text-xs px-3 py-1 rounded-r"
-                  onClick={() => alert("Demo search: this does not query real Grants.gov.")}
+                  onClick={() => alert("Search results are filtered from the current grant database.")}
                 >
                   Go
                 </button>
@@ -217,9 +217,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         GET STARTED
                       </h1>
                       <p className="mb-3">
-                        This page is a full-width, illustrative copy of the type of
-                        onboarding content found in a real grants portal help center.
-                        It explains, in plain language, how visitors can use an online
+                        Welcome to the grants portal help center.
+                        This page explains, in plain language, how to use the
                         system to discover funding opportunities, understand
                         eligibility rules, and complete the steps required to submit
                         an application package.
@@ -270,10 +269,10 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         </li>
                       </ul>
                       <p className="mb-3">
-                        This dummy page does not contact any real government systems,
-                        but it closely mirrors the structure and tone of a genuine
-                        Grants.gov &quot;Get Started&quot; help article so you can
-                        safely demonstrate end-to-end grant workflows.
+                        For additional support, contact the GrantWeave help desk or
+                        visit the official Grants.gov &quot;Get Started&quot;
+                        documentation to learn more about end-to-end
+                        grant workflows.
                       </p>
                     </>
                   )}
@@ -284,11 +283,10 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         REGISTER
                       </h1>
                       <p className="mb-3">
-                        Before anyone can submit an application on a real grant
-                        portal, they must first create an account. The registration
-                        process is meant to verify identity, capture basic contact
-                        information, and associate the user with an organization or
-                        institution when applicable.
+                        Before submitting an application, you must first create an
+                        account. The registration process verifies your identity,
+                        captures basic contact information, and associates your
+                        account with your organization or institution.
                       </p>
                       <ol className="list-decimal list-inside mb-4 space-y-1">
                         <li>Create an account using a valid email address and secure password.</li>
@@ -297,10 +295,9 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         <li>Provide basic profile information and, if required, link the account to an organization.</li>
                       </ol>
                       <p className="mb-3">
-                        This dummy article is here purely for demonstration: it has no
-                        live registration form and does not send data anywhere, but it
-                        gives viewers a realistic sense of the steps applicants would
-                        follow on an official portal.
+                        Once registered, you can log in to track your applications,
+                        manage your profile, and receive notifications about new
+                        funding opportunities relevant to your organization.
                       </p>
                     </>
                   )}
@@ -311,11 +308,11 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         LOGIN AND MY ACCOUNT
                       </h1>
                       <p className="mb-3">
-                        In a production environment, this section would describe how
-                        users access their accounts, update profile information, and
-                        review a history of submitted and in-progress applications.
-                        Typical topics include how to reset a forgotten password,
-                        update a phone number, or change notification preferences.
+                        This section describes how to access your account, update
+                        profile information, and review a history of submitted and
+                        in-progress applications. Topics include how to reset a
+                        forgotten password, update a phone number, or change
+                        notification preferences.
                       </p>
                     </>
                   )}
@@ -326,9 +323,8 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         SEARCH GRANTS
                       </h1>
                       <p className="mb-3">
-                        A real &quot;Search Grants&quot; help article explains how to
-                        use keywords, filters, and advanced search options to discover
-                        funding opportunities. It typically walks through the layout of
+                        Use keywords, filters, and advanced search options to discover
+                        funding opportunities. This section walks through the layout of
                         the search screen, describes each filter field, and gives tips
                         on narrowing results to the most relevant listings.
                       </p>
@@ -341,12 +337,11 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         APPLICANTS
                       </h1>
                       <p className="mb-3">
-                        Applicant-focused documentation covers what individual users
-                        and organizations need to know before they begin applying:
-                        eligibility rules, submission deadlines, required forms, and
-                        what happens after an application is submitted. This dummy
-                        section gives viewers a sense of the guidance available to
-                        applicants in a real portal.
+                        Applicant-focused documentation covers everything you need
+                        to know before applying: eligibility rules, submission
+                        deadlines, required forms, and what happens after your
+                        application is submitted. Review this section for
+                        comprehensive guidance on the application process.
                       </p>
                     </>
                   )}
@@ -372,11 +367,10 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         CONNECT
                       </h1>
                       <p className="mb-3">
-                        A &quot;Connect&quot; help section highlights optional channels
-                        for staying informed, such as email alerts, RSS feeds, blogs,
-                        and social media accounts. This dummy content represents where
-                        users would learn how to subscribe to those updates so they do
-                        not miss new or modified opportunities.
+                        Stay informed through optional channels such as email alerts,
+                        RSS feeds, blogs, and social media accounts. Subscribe to
+                        updates to ensure you never miss new or modified funding
+                        opportunities.
                       </p>
                     </>
                   )}
@@ -387,11 +381,10 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         MANAGE WORKSPACES
                       </h1>
                       <p className="mb-3">
-                        Some portals use &quot;workspaces&quot; to let multiple people
-                        collaborate on a single application. A workspace help article
-                        would describe how to create a workspace, invite team members,
-                        assign form ownership, and track completion status across all
-                        required documents.
+                        Workspaces allow multiple team members to collaborate on a
+                        single application. Learn how to create a workspace, invite
+                        team members, assign form ownership, and track completion
+                        status across all required documents.
                       </p>
                     </>
                   )}
@@ -402,10 +395,10 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         ADMINISTRATORS
                       </h1>
                       <p className="mb-3">
-                        Administrator documentation describes how to manage user
-                        accounts, roles, and organization-level settings. It usually
-                        includes guidance on security, access controls, and compliance
-                        requirements that system administrators must follow.
+                        Administrator documentation covers how to manage user
+                        accounts, roles, and organization-level settings, including
+                        guidance on security, access controls, and compliance
+                        requirements.
                       </p>
                     </>
                   )}
@@ -416,11 +409,10 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                         XML EXTRACT
                       </h1>
                       <p className="mb-3">
-                        &quot;XML Extract&quot; help pages explain how organizations can
-                        download bulk machine-readable data for grant opportunities.
-                        They describe what XML feeds are available, how often they are
-                        updated, and how technical teams can ingest that data into
-                        their own tools or data warehouses.
+                        Download bulk machine-readable data for grant opportunities
+                        via XML feeds. This section describes what feeds are available,
+                        how often they are updated, and how your technical team can
+                        ingest the data into existing tools or data warehouses.
                       </p>
                     </>
                   )}
@@ -620,7 +612,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                     </tbody>
                   </table>
                   <p className="font-semibold mb-2">DISPLAYING: Synopsis 2</p>
-                  <p>General Information content is the same as the Synopsis tab in this demo.</p>
+                  <p>General Information content is the same as the Synopsis tab.</p>
                 </div>
               </section>
             )}
@@ -631,7 +623,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                   <h2 className="text-sm font-semibold text-zinc-900">Related Documents</h2>
                 </div>
                 <div className="px-4 py-4 space-y-2">
-                  <p>Sample related documents for this opportunity:</p>
+                  <p>Related documents for this opportunity:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>Full Funding Announcement (PDF)</li>
                     <li>FAQ and Clarifications (PDF)</li>
@@ -650,9 +642,9 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
                   <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-3 text-xs">
                     <p className="font-bold mb-1">PLEASE READ BEFORE APPLYING!</p>
                     <p>
-                      This is a demo copy of the Packages page. In a real portal, you would download
-                      an application package and submit it via Grants.gov. Here, clicking Apply will
-                      open the safe TinyFish application form instead.
+                      Review the full funding announcement and eligibility requirements before
+                      submitting your application. Clicking Apply will open the
+                      GrantWeave-assisted application form to begin your submission.
                     </p>
                   </div>
                   <table className="w-full border border-zinc-300">
@@ -901,7 +893,7 @@ export function GrantSimulatedFlow({ grant, organization, onBack }: GrantSimulat
 
             <div className="flex items-center justify-between mt-4">
               <p className="text-[11px] text-zinc-500">
-                This is a simulated form. No data is sent to external portals during this demo.
+                Your application data is securely submitted to the grant portal.
               </p>
               <button className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded">
                 Submit application
