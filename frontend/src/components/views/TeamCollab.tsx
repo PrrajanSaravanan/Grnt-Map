@@ -230,7 +230,7 @@ function TeamCollabInner({ organization }: TeamCollabProps) {
                   </div>
                   
                   <p className="text-zinc-600 text-xs">
-                    Move your mouse to see cursors • TinyFish Secure Channel
+                    Move your mouse to see cursors • GrantWeave Secure Channel
                   </p>
                 </motion.div>
               </motion.div>

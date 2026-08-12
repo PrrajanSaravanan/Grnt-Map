@@ -4,9 +4,13 @@
   "version": "0.0.0",
   "description": "GrantWeave – frontend and backend in separate folders",
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "./dev.sh",
+    "dev:no-ml": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
+    "dev:ml": "cd ml && ./venv/bin/python -m uvicorn app:app --port 8000",
+    "stop": "lsof -ti:8000,3001,5173 -sTCP:LISTEN | xargs -r kill",
+    "build:index": "cd ml && ./venv/bin/python build_index.py",
     "build": "cd frontend && npm run build",
     "start": "cd backend && npm run start",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"

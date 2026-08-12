@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Shield, Database, FileDown } from "lucide-react";
 import { Organization } from "@/types";
-import { auth, getCurrentUserProfile } from "@/firebase";
+import { auth, getCurrentUserProfile, UserProfile } from "@/firebase";
 import { downloadProfilePdf } from "@/lib/profilePdf";
 
 interface SettingsProps {
@@ -11,10 +11,17 @@ interface SettingsProps {
 export function Settings({ organization }: SettingsProps) {
   const [profilePdfLoading, setProfilePdfLoading] = useState(false);
   const [profilePdfError, setProfilePdfError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   // Privacy toggle states
   const [encryptionEnabled, setEncryptionEnabled] = useState(true);
   const [benchmarkEnabled, setBenchmarkEnabled] = useState(false);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    getCurrentUserProfile(user.uid).then(setProfile).catch(() => setProfile(null));
+  }, []);
 
   const handleDownloadProfilePdf = async () => {
     const user = auth.currentUser;
@@ -38,13 +45,10 @@ export function Settings({ organization }: SettingsProps) {
     }
   };
 
-  const checkpointId = Math.floor(Math.random() * 1000) + 500;
-  const records = Math.floor(Math.random() * 100) + 20;
-
   return (
     <div className="flex-1 bg-zinc-950 p-8 overflow-y-auto">
       <div className="max-w-3xl mx-auto">
-        <h2 className="text-2xl font-bold text-white mb-8">Settings & Akasha Ledger</h2>
+        <h2 className="text-2xl font-bold text-white mb-8">Settings & Agent Memory</h2>
 
         <div className="space-y-6">
           {/* Profile export */}
@@ -76,40 +80,24 @@ export function Settings({ organization }: SettingsProps) {
                 <Database className="text-purple-400" size={24} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-white mb-1">Persistent Memory (Akasha)</h3>
-                <p className="text-sm text-zinc-400 mb-4">Manage the long-term memory checkpoints of your swarm agents.</p>
-                
+                <h3 className="text-lg font-semibold text-white mb-1">Persistent Memory</h3>
+                <p className="text-sm text-zinc-400 mb-4">What the GrantWeave Agent actually remembers about your organization, stored in Firestore.</p>
+
                 <div className="bg-zinc-950 rounded-lg p-4 border border-white/5 font-mono text-xs space-y-2">
                   <div className="flex justify-between text-zinc-500">
-                    <span>Ledger Status</span>
-                    <span className="text-emerald-400">Synced • Updated just now</span>
+                    <span>Profile status</span>
+                    <span className={profile?.onboardingCompleted ? "text-emerald-400" : "text-zinc-500"}>
+                      {profile ? (profile.onboardingCompleted ? "Onboarded & synced" : "Not yet onboarded") : "Not signed in"}
+                    </span>
                   </div>
                   <div className="h-px bg-white/5 my-2" />
                   <div className="flex justify-between">
-                    <span className="text-zinc-300">Temporal Fabric Checkpoint #{checkpointId}</span>
-                    <span className="text-zinc-500">{(records * 0.3).toFixed(1)} MB</span>
+                    <span className="text-zinc-300">Grants excluded from future searches</span>
+                    <span className="text-zinc-500">{profile?.excludedGrantIds?.length ?? 0}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-300">EvoForge Mutation History</span>
-                    <span className="text-zinc-500">{records} Records</span>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">System Learning History</h4>
-                  <div className="space-y-2">
-                    <div className="flex gap-3 text-sm">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="text-zinc-300">Portal layout updated — Agents adapted automatically</span>
-                    </div>
-                    <div className="flex gap-3 text-sm">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="text-zinc-300">New {organization?.focusAreas?.[0]?.toLowerCase() || "grant"} keywords discovered — Matching improved by 18%</span>
-                    </div>
-                    <div className="flex gap-3 text-sm">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="text-zinc-300">Successful grant submission template saved</span>
-                    </div>
+                    <span className="text-zinc-300">Focus areas remembered</span>
+                    <span className="text-zinc-500">{profile?.focusAreas?.length ?? 0}</span>
                   </div>
                 </div>
               </div>

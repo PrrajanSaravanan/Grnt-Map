@@ -4,7 +4,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { getFirestore, doc, setDoc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, setDoc, updateDoc, getDoc, serverTimestamp, arrayUnion } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -126,6 +126,8 @@ export interface UserProfile {
   pitchDocText?: string | null;
   onboardingCompleted?: boolean;
   matchedGrants?: any[];
+  /** Grant IDs the agent should never resurface — the org already applied to or dismissed them. */
+  excludedGrantIds?: string[];
   createdAt?: string;
   updatedAt?: unknown;
 }
@@ -133,5 +135,11 @@ export interface UserProfile {
 export async function getCurrentUserProfile(userId: string): Promise<UserProfile | null> {
   const snap = await getDoc(doc(db, "users", userId));
   return snap.exists() ? (snap.data() as UserProfile) : null;
+}
+
+/** Agent memory: record that a grant has been acted on so it's never suggested again for this org. */
+export async function addExcludedGrantId(userId: string, grantId: string) {
+  const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, { excludedGrantIds: arrayUnion(grantId) });
 }
 

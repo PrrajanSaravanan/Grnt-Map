@@ -17,7 +17,7 @@ import "@xyflow/react/dist/style.css";
 import { GrantNode } from "./GrantNode";
 import { GrantDetailsPanel } from "./GrantDetailsPanel";
 import { AnimatePresence } from "motion/react";
-import { generateGrants } from "../services/ai";
+import { runAgentPipeline, AgentEvent } from "../services/ai";
 import { Grant, Organization } from "../types";
 
 const nodeTypes = {
@@ -30,9 +30,12 @@ interface MindMapProps {
   organization: Organization;
   wsRef?: React.MutableRefObject<WebSocket | null>;
   searchQuery?: string;
+  onTraceUpdate?: (trace: AgentEvent[]) => void;
+  onRunningChange?: (running: boolean) => void;
+  excludeIds?: string[];
 }
 
-export function MindMap({ onSelectionChange, onApply, organization, wsRef, searchQuery }: MindMapProps) {
+export function MindMap({ onSelectionChange, onApply, organization, wsRef, searchQuery, onTraceUpdate, onRunningChange, excludeIds }: MindMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedGrant, setSelectedGrant] = useState<Grant | null>(null);
@@ -42,36 +45,31 @@ export function MindMap({ onSelectionChange, onApply, organization, wsRef, searc
   const [syncedFromServer, setSyncedFromServer] = useState(false);
   const hasSentInitialSync = useRef(false);
   const isRemoteUpdate = useRef(false);
+  // Read via ref so applying a grant (which updates excludeIds) doesn't retrigger a full re-search.
+  const excludeIdsRef = useRef(excludeIds);
+  excludeIdsRef.current = excludeIds;
 
   useEffect(() => {
     const fetchGrants = async () => {
       setLoading(true);
       setSyncedFromServer(false);
       hasSentInitialSync.current = false;
-      
-      // Use search query if provided, otherwise construct from org profile
-      // Also use matchedGrants from org profile if no search query provided
-      console.log("[MindMap] fetchGrants called with searchQuery:", searchQuery, "organization.matchedGrants:", organization.matchedGrants?.length);
-      if (!searchQuery && organization.matchedGrants && organization.matchedGrants.length > 0) {
-        console.log("[MindMap] Using matched grants from profile");
-        setAvailableGrants(organization.matchedGrants);
-        setVisibleGrantIds([]);
-        setSelectedGrant(null);
-        setLoading(false);
-        return;
-      }
 
-      console.log("[MindMap] Falling back to generateGrants");
-      let query: string;
-      if (searchQuery) {
-        query = searchQuery;
-      } else {
-        const focus = organization.focusAreas?.join(", ") || "general non-profit";
-        query = `${focus} grants for ${organization.mission}`;
-      }
-      
-      console.log("Generating grants for query:", query);
-      const grants = await generateGrants(query);
+      // Always run the agent pipeline: cached results would bypass eligibility
+      // screening, and a grant that was open last week may have closed since.
+      console.log("[MindMap] Running agent pipeline, searchQuery:", searchQuery);
+      onTraceUpdate?.([]);
+      onRunningChange?.(true);
+      const liveTrace: AgentEvent[] = [];
+      const { grants } = await runAgentPipeline(
+        organization,
+        { query: searchQuery, excludeIds: excludeIdsRef.current || [] },
+        (event) => {
+          liveTrace.push(event);
+          onTraceUpdate?.([...liveTrace]);
+        }
+      );
+      onRunningChange?.(false);
       setAvailableGrants(grants);
       setVisibleGrantIds([]);
       setSelectedGrant(null);
@@ -369,9 +367,9 @@ export function MindMap({ onSelectionChange, onApply, organization, wsRef, searc
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </div>
         <span>
-          {loading ? "Agent discovering grants..." : 
-           visibleGrantIds.length < availableGrants.length 
-            ? `Agent #${Math.floor(Math.random() * 10) + 1} discovering...` 
+          {loading ? "Agent discovering grants..." :
+           visibleGrantIds.length < availableGrants.length
+            ? "Agent revealing more matches..."
             : "Discovery Complete"}
         </span>
       </div>

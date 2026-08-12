@@ -15,13 +15,14 @@ import { Settings } from "@/components/views/Settings";
 import { ApplicationBuilder } from "@/components/views/ApplicationBuilder";
 import { MyApplications } from "@/components/views/MyApplications";
 import { Login } from "@/components/views/Login";
-import { GrantSimulatedFlow } from "@/components/views/GrantSimulatedFlow";
+import { ApplicationPackageView } from "@/components/views/ApplicationPackageView";
 import { ReactFlowProvider } from "@xyflow/react";
 import { ActiveMonitoringWidget } from "@/components/ActiveMonitoringWidget";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { Grant, Application, Organization } from "@/types";
-import { auth, getCurrentUserProfile } from "@/firebase";
+import { auth, getCurrentUserProfile, addExcludedGrantId } from "@/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { AgentEvent } from "@/services/ai";
 
 const DEFAULT_ORG: Organization = {
   name: "My Organization",
@@ -46,6 +47,15 @@ export default function App() {
   const [organizationProfile, setOrganizationProfile] = useState<Organization>(DEFAULT_ORG);
   const [userFullName, setUserFullName] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [agentTrace, setAgentTrace] = useState<AgentEvent[]>([]);
+  const [isAgentRunning, setIsAgentRunning] = useState(false);
+  const [excludedGrantIds, setExcludedGrantIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("grantweave:excludedGrantIds") || "[]");
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setUserId(user?.uid ?? null));
@@ -83,6 +93,18 @@ export default function App() {
         type: profile.organizationType ?? profile.type ?? prev.type,
         matchedGrants: profile.matchedGrants ?? prev.matchedGrants,
       }));
+      // Agent memory: merge Firestore's cross-session record with the local cache.
+      if (Array.isArray(profile.excludedGrantIds) && profile.excludedGrantIds.length > 0) {
+        setExcludedGrantIds((prev) => {
+          const merged = Array.from(new Set([...prev, ...profile.excludedGrantIds!]));
+          try {
+            localStorage.setItem("grantweave:excludedGrantIds", JSON.stringify(merged));
+          } catch {
+            // ignore storage errors in demo
+          }
+          return merged;
+        });
+      }
     });
   }, [userId]);
 
@@ -92,20 +114,6 @@ export default function App() {
       setIsAuthenticated(true);
       setHasOnboarded(true);
       setCurrentView("collab");
-    } else if (params.get("view") === "grant-sim") {
-      setIsAuthenticated(true);
-      setHasOnboarded(true);
-      // Hydrate selected grant from localStorage for the simulated tab
-      try {
-        const stored = localStorage.getItem("tinyfish:lastGrant");
-        if (stored) {
-          const parsed = JSON.parse(stored) as Grant;
-          setSelectedGrantForBuilder(parsed);
-        }
-      } catch {
-        // ignore JSON errors in demo
-      }
-      setCurrentView("grant-sim");
     }
   }, []);
 
@@ -142,15 +150,36 @@ export default function App() {
       };
       setMyApplications(prev => [newApplication, ...prev]);
     }
-    // Store selected grant so a new tab can pick it up
+    // Agent memory: never resurface a grant the user already acted on
+    setExcludedGrantIds((prev) => {
+      if (prev.includes(grant.id)) return prev;
+      const next = [...prev, grant.id];
+      try {
+        localStorage.setItem("grantweave:excludedGrantIds", JSON.stringify(next));
+      } catch {
+        // ignore storage errors in demo
+      }
+      return next;
+    });
+    if (userId) {
+      addExcludedGrantId(userId, grant.id).catch((e) => console.error("Failed to persist excluded grant:", e));
+    }
     try {
-      localStorage.setItem("tinyfish:lastGrant", JSON.stringify(grant));
+      localStorage.setItem("grantweave:lastGrant", JSON.stringify(grant));
     } catch {
       // ignore storage errors in demo
     }
-    // Open simulated Grants.gov view in a completely new tab
-    const url = `${window.location.origin}?view=grant-sim`;
-    window.open(url, "_blank", "noopener,noreferrer");
+
+    // Send the user to the funder's real listing — that's where the official
+    // announcement and application package actually live.
+    if (grant.url && grant.url !== "#") {
+      window.open(grant.url, "_blank", "noopener,noreferrer");
+    }
+
+    // Meanwhile, prepare our package in-app rather than in a tab that could be
+    // mistaken for the funder's own site.
+    setSelectedGrantForBuilder(grant);
+    setCurrentView("package");
   };
 
   const handleUpdateApplicationStatus = (grantId: string, status: string, progress: number) => {
@@ -167,19 +196,6 @@ export default function App() {
     return <Onboarding userId={userId} onComplete={handleOnboardingComplete} />;
   }
 
-  // Special minimal layout for simulated Grants.gov tab: no sidebar or app chrome
-  if (currentView === "grant-sim") {
-    return (
-      <div className="flex h-screen w-screen bg-white text-zinc-900 overflow-hidden">
-        <GrantSimulatedFlow
-          grant={selectedGrantForBuilder}
-          organization={organizationProfile}
-          onBack={() => window.close()}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen w-screen bg-zinc-950 text-white overflow-hidden font-sans selection:bg-emerald-500/30">
       {/* Left Sidebar */}
@@ -193,14 +209,15 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 min-w-0 relative">
         {/* Top Header */}
-        <Header 
-          onNotificationClick={() => setIsNotificationOpen(true)} 
+        <Header
+          onNotificationClick={() => setIsNotificationOpen(true)}
           organization={organizationProfile}
           userName={userFullName}
           onSearch={(query) => {
             setSearchQuery(query);
             setCurrentView("dashboard");
           }}
+          isAgentRunning={isAgentRunning}
         />
 
         {/* Middle Section: Canvas/View + Right Panel */}
@@ -211,17 +228,24 @@ export default function App() {
             <div className="flex-1 relative bg-zinc-950 flex flex-col">
                <div className="flex-1 relative">
                   <ReactFlowProvider>
-                    <MindMap 
-                      onSelectionChange={setIsGrantSelected} 
+                    <MindMap
+                      onSelectionChange={setIsGrantSelected}
                       onApply={handleApplyToGrant}
                       organization={organizationProfile}
                       searchQuery={searchQuery}
+                      onTraceUpdate={setAgentTrace}
+                      onRunningChange={setIsAgentRunning}
+                      excludeIds={excludedGrantIds}
                     />
                   </ReactFlowProvider>
-                  
+
                   {/* Floating Widget */}
                   <div className="absolute top-4 left-4 z-10">
-                    <ActiveMonitoringWidget organization={organizationProfile} />
+                    <ActiveMonitoringWidget
+                      organization={organizationProfile}
+                      trace={agentTrace}
+                      isRunning={isAgentRunning}
+                    />
                   </div>
                </div>
                {/* Timeline removed as per user request */}
@@ -231,10 +255,16 @@ export default function App() {
               applications={myApplications}
               onOpenBuilder={handleOpenBuilder} 
             />
+          ) : currentView === "package" ? (
+            <ApplicationPackageView
+              grant={selectedGrantForBuilder}
+              organization={organizationProfile}
+              onBack={() => setCurrentView("dashboard")}
+            />
           ) : currentView === "builder" ? (
-            <ApplicationBuilder 
-              grant={selectedGrantForBuilder} 
-              onBack={() => setCurrentView("applications")} 
+            <ApplicationBuilder
+              grant={selectedGrantForBuilder}
+              onBack={() => setCurrentView("applications")}
               onUpdateStatus={handleUpdateApplicationStatus}
               organization={organizationProfile}
             />
@@ -250,7 +280,7 @@ export default function App() {
 
           {/* Right Activity Feed - Always visible on Dashboard unless grant selected */}
           {currentView === "dashboard" && !isGrantSelected && (
-            <ActivityFeed organization={organizationProfile} />
+            <ActivityFeed organization={organizationProfile} trace={agentTrace} isRunning={isAgentRunning} />
           )}
         </div>
 

@@ -1,5 +1,7 @@
 export interface Grant {
   id: string;
+  /** Grants.gov numeric opportunity id — needed to fetch the live record. */
+  oppId?: string;
   title: string;
   amount: string;
   deadline: string;

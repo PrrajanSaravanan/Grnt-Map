@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Save, FileText, Paperclip, Sparkles, CheckCircle2, Circle, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Grant, Organization } from "@/types";
-import { generateApplicationContent } from "@/services/ai";
+import { runApplicationAgent, AgentEvent } from "@/services/ai";
 
 export function ApplicationBuilder({ 
   onBack, 
@@ -29,6 +29,8 @@ export function ApplicationBuilder({
     budget: "",
     impact: "",
   });
+  const [fieldsNeedingHumanInput, setFieldsNeedingHumanInput] = useState<string[]>([]);
+  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [files, setFiles] = useState<{ name: string; size: string }[]>([]);
@@ -63,8 +65,20 @@ export function ApplicationBuilder({
     const fetchContent = async () => {
       if (grant) {
         setLoading(true);
-        const generated = await generateApplicationContent(grant, organization);
-        setContent(generated);
+        const live: AgentEvent[] = [];
+        const pkg = await runApplicationAgent(organization, grant, (e) => {
+          live.push(e);
+          setAgentEvents([...live]);
+        });
+        if (pkg) {
+          setContent({
+            overview: pkg.narrative.projectAbstract,
+            mission: pkg.narrative.statementOfNeed,
+            budget: pkg.narrative.budgetNarrative,
+            impact: pkg.narrative.expectedOutcomes.map((i) => `• ${i}`).join("\n"),
+          });
+          setFieldsNeedingHumanInput(pkg.requiresHumanInput);
+        }
         setLoading(false);
       } else {
         // Fallback or empty state if no grant selected (shouldn't happen in this flow)
@@ -173,17 +187,37 @@ export function ApplicationBuilder({
             <div className="bg-gradient-to-r from-emerald-900/20 to-cyan-900/20 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-3">
               <Sparkles className="text-emerald-400 shrink-0 mt-0.5" size={18} />
               <div>
-                <h3 className="text-sm font-medium text-emerald-400 mb-1">TinyFish Pre-fill Active</h3>
+                <h3 className="text-sm font-medium text-emerald-400 mb-1">Drafted by the Application Agent</h3>
                 <p className="text-xs text-zinc-300">
-                  We've pre-filled 85% of this application using your organization profile and past successful grants. Review and edit below.
+                  Narrative sections below were drafted from your organization profile and this
+                  opportunity's published requirements. Anything the agent could not derive is listed
+                  as needing your input rather than invented. Review and edit before submitting.
                 </p>
               </div>
             </div>
 
+            {!loading && fieldsNeedingHumanInput.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+                <h3 className="text-sm font-medium text-amber-400 mb-2">Agent flagged these for your input</h3>
+                <ul className="text-xs text-zinc-300 space-y-1 list-disc list-inside">
+                  {fieldsNeedingHumanInput.map((f, i) => (
+                    <li key={i}>{f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
+                <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
                     <Loader2 className="animate-spin mb-4 text-emerald-500" size={32} />
-                    <p>Generating application content with TinyFish...</p>
+                    <p className="mb-4">Application Agent is preparing your package...</p>
+                    <ul className="text-xs text-left space-y-1 max-w-md w-full">
+                      {agentEvents.slice(-5).map((e, i) => (
+                        <li key={i} className="text-zinc-400">
+                          <span className="text-amber-400 font-mono">[{e.agent}]</span> {e.detail}
+                        </li>
+                      ))}
+                    </ul>
                 </div>
             ) : (
                 <div className="space-y-6">

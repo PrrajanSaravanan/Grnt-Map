@@ -67,45 +67,11 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
       type: formData.type
     };
 
-    let matchedGrants: any[] = [];
-    try {
-      const mlPayload = {
-        org_type: formData.type || "NGO",
-        sector: formData.focusAreas.length > 0 ? formData.focusAreas[0].toLowerCase() : "education",
-        project_description: formData.mission || "Description",
-        requested_amount: minGrantSize
-      };
-      console.log("[Onboarding] Calling ML route with payload:", mlPayload);
-      
-      const res = await fetch("http://127.0.0.1:8000/match-grants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mlPayload)
-      });
-      console.log("[Onboarding] ML route response status:", res.status);
-      if (res.ok) {
-        const mlData = await res.json();
-        console.log("[Onboarding] ML route received data:", mlData);
-        matchedGrants = mlData.map((g: any, i: number) => ({
-          id: `ml-grant-${Date.now()}-${i}`,
-          title: g.title || "Unknown Grant",
-          amount: g.award_ceiling ? `$${g.award_ceiling.toLocaleString()}` : "Varies",
-          deadline: g.deadline && g.deadline !== "nan" ? g.deadline : "Rolling",
-          portal: g.agency || "Grants.gov",
-          matchScore: g.match_score != null ? Math.round(g.match_score) : 50,
-          description: `This grant maps to your focus areas: ${formData.focusAreas.join(", ")}.`,
-          url: g.url || "#",
-          matchReason: `AI matching score of ${g.match_score}`,
-          probability: g.match_score != null ? Math.floor(g.match_score) : 50,
-          probabilityReason: "Based on ML similarity model.",
-          requirements: ["Eligible organization", "Matches agency mission", "Timely submission"],
-          location: regions.length > 0 ? regions[0] : "USA",
-          type: "Government"
-        }));
-      }
-    } catch (e) {
-      console.error("Failed to fetch ML route:", e);
-    }
+    // Grant discovery is the agent team's job — the dashboard runs the full
+    // Planner → Discovery → Eligibility pipeline on load. Calling the raw
+    // matcher here would store unscreened results that bypass eligibility.
+    const matchedGrants: any[] = [];
+
     if (userId) {
       try {
         await updateUserOnboarding(userId, {

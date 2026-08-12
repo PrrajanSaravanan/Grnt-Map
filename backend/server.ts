@@ -1,9 +1,17 @@
+try {
+  process.loadEnvFile();
+} catch {
+  // No .env file present (e.g. production, where env vars are injected directly) — ignore.
+}
+
 import express from "express";
 import cors from "cors";
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import { runGrantPipeline, runApplicationFor } from "./agents/orchestrator.js";
+import { prepareSubmission } from "./agents/submission.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -182,109 +190,84 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  app.get("/api/grants", async (req, res) => {
-    const query = (req.query.q as string) || "climate";
+  /**
+   * Runs the six-agent pipeline. Streams every agent's step as newline-delimited
+   * JSON so the UI can attribute each line to the agent that produced it.
+   */
+  app.post("/api/agent/run", async (req, res) => {
+    const { organization, query, excludeIds, autoApply } = req.body;
+    res.writeHead(200, {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
     try {
-      const response = await fetch("https://apply07.grants.gov/grantsws/rest/opportunities/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword: query, oppStatuses: "posted" })
-      });
-
-      if (!response.ok) throw new Error("Failed to fetch from Grants.gov");
-
-      const data = await response.json();
-      const opps = data.oppHits?.slice(0, 5) || [];
-
-      if (opps.length === 0) throw new Error("No results found");
-
-      const grants = opps.map((opp: any, index: number) => ({
-        id: opp.id || `grant-${index}`,
-        title: opp.title || "Unknown Grant",
-        amount: opp.estimatedFunding ? `$${opp.estimatedFunding.toLocaleString()}` : "Varies",
-        deadline: opp.closeDate || "Rolling",
-        portal: opp.agency || "Grants.gov",
-        matchScore: Math.floor(Math.random() * 15) + 80,
-        description: opp.description || `Funding opportunity provided by ${opp.agency}.`,
-        url: `https://www.grants.gov/search-results-detail/${opp.id}`,
-        matchReason: `Matches your search for "${query}" within the ${opp.agency} database.`,
-        probability: Math.floor(Math.random() * 20) + 50,
-        probabilityReason: "Based on historical agency funding rates.",
-        requirements: ["Eligible organization", "Matches agency mission", "Timely submission"],
-        location: "USA / Global",
-        type: "Government"
-      }));
-
-      res.json(grants);
+      const result = await runGrantPipeline(
+        {
+          org: organization || {},
+          userQuery: query,
+          excludeIds: excludeIds || [],
+          autoApply: Boolean(autoApply),
+        },
+        (event) => res.write(JSON.stringify({ type: "event", event }) + "\n")
+      );
+      res.write(
+        JSON.stringify({
+          type: "done",
+          grants: result.grants,
+          applicationPackage: result.applicationPackage,
+        }) + "\n"
+      );
     } catch (error) {
-      console.error("Live fetch error, falling back to mock data:", error);
-      res.json([
-        {
-          id: "mock-1",
-          title: "Global Climate Innovation Fund",
-          amount: "$150,000",
-          deadline: "2026-08-15",
-          portal: "Climate Action Network",
-          matchScore: 92,
-          description: "Funding for innovative approaches to climate change mitigation and adaptation.",
-          url: "#",
-          matchReason: "Directly aligns with your focus on climate solutions.",
-          probability: 68,
-          probabilityReason: "Strong alignment, but highly competitive.",
-          requirements: ["501(c)(3) status", "3+ years of operation", "Measurable impact metrics"],
-          location: "Global",
-          type: "Private Foundation"
-        },
-        {
-          id: "mock-2",
-          title: "Community Resilience Grant",
-          amount: "$50,000",
-          deadline: "Rolling",
-          portal: "Community Foundation",
-          matchScore: 85,
-          description: "Support for local initiatives building community resilience against environmental challenges.",
-          url: "#",
-          matchReason: "Matches your community-level intervention strategy.",
-          probability: 70,
-          probabilityReason: "Local focus reduces competition pool.",
-          requirements: ["Local registration", "Community partnership", "Annual budget under $1M"],
-          location: "USA",
-          type: "Community Foundation"
-        },
-        {
-          id: "mock-3",
-          title: "Tech for Good Initiative",
-          amount: "$75,000",
-          deadline: "2026-10-01",
-          portal: "TechCorp Philanthropy",
-          matchScore: 78,
-          description: "Grants for non-profits leveraging technology to solve pressing social and environmental issues.",
-          url: "#",
-          matchReason: "Your use of data and tech aligns with their funding priorities.",
-          probability: 55,
-          probabilityReason: "Requires strong technical proof-of-concept.",
-          requirements: ["Technology-driven solution", "Open-source commitment", "Scalability plan"],
-          location: "Global",
-          type: "Corporate"
-        }
-      ]);
+      console.error("Agent pipeline error:", error);
+      res.write(JSON.stringify({ type: "error", error: (error as Error).message }) + "\n");
+    } finally {
+      res.end();
     }
   });
 
-  app.post("/api/generate-application", (req, res) => {
-    const { grant, org } = req.body;
-    const content = {
-      overview: `We are uniquely positioned to execute the "${grant.title}" project. Our organization, ${org.name}, has a proven track record of delivering high-impact results. With a dedicated team and robust community partnerships, we ensure that every dollar of the ${grant.amount} is maximized for tangible outcomes.`,
-      mission: `To empower communities through sustainable solutions that directly address the core objectives of the ${grant.title} initiative, aligning perfectly with our mission: ${org.mission}.`,
-      budget: `The ${grant.amount} will be allocated as follows: 40% to direct program implementation, 30% to community outreach and training, 20% to technology and infrastructure, and 10% to rigorous monitoring and evaluation.`,
-      impact: [
-        `Directly engage and support over 5,000 community members in the first year through ${org.name}'s network.`,
-        "Establish 3 new sustainable community hubs.",
-        "Reduce local environmental impact metrics by 15% within 18 months.",
-        "Publish a comprehensive, open-source framework for regional scalability."
-      ],
-    };
-    res.json(content);
+  /**
+   * Validates a completed package and, if it passes, emits the SF-424 XML the
+   * applicant uploads into their own Grants.gov Workspace. GrantWeave never
+   * transmits to Grants.gov — federal submission requires AOR certification.
+   */
+  app.post("/api/agent/submit", (req, res) => {
+    const { applicationPackage, organization, credentials } = req.body;
+    if (!applicationPackage) {
+      res.status(400).json({ error: "Missing applicationPackage" });
+      return;
+    }
+    try {
+      res.json(prepareSubmission(applicationPackage, organization || {}, credentials || {}));
+    } catch (error) {
+      console.error("Submission prep error:", error);
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  /** Drafts an application package for one specific grant chosen by the user. */
+  app.post("/api/agent/apply", async (req, res) => {
+    const { organization, grant } = req.body;
+    if (!grant) {
+      res.status(400).json({ error: "Missing grant" });
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+    try {
+      const pkg = await runApplicationFor(organization || {}, grant, (event) =>
+        res.write(JSON.stringify({ type: "event", event }) + "\n")
+      );
+      res.write(JSON.stringify({ type: "done", applicationPackage: pkg }) + "\n");
+    } catch (error) {
+      console.error("Application agent error:", error);
+      res.write(JSON.stringify({ type: "error", error: (error as Error).message }) + "\n");
+    } finally {
+      res.end();
+    }
   });
 
   if (isProduction) {

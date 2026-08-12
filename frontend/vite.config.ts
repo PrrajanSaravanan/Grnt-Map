@@ -5,7 +5,9 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '');
-  const apiUrl = 'https://grnt-map-1.onrender.com/';
+  // Local dev proxies to the local backend (where GEMINI_API_KEY / the agent live) by default.
+  // Override with VITE_API_PROXY_TARGET to point at a deployed backend instead.
+  const apiUrl = env.VITE_API_PROXY_TARGET || 'http://localhost:3001';
   return {
     plugins: [react(), tailwindcss()],
     define: {

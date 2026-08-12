@@ -7,9 +7,10 @@ interface HeaderProps {
   organization?: Organization;
   userName?: string;
   onSearch?: (query: string) => void;
+  isAgentRunning?: boolean;
 }
 
-export function Header({ onNotificationClick, organization, userName, onSearch }: HeaderProps) {
+export function Header({ onNotificationClick, organization, userName, onSearch, isAgentRunning }: HeaderProps) {
   const focusArea = organization?.focusAreas?.[0] || "grants";
   const location = organization?.regions?.[0] || "your region";
   const minGrant = organization?.minGrant || "any";
@@ -23,30 +24,6 @@ export function Header({ onNotificationClick, organization, userName, onSearch }
   useEffect(() => {
     setSearchQuery(defaultQuery);
   }, [defaultQuery]);
-
-  // Live agent count — fluctuates for a real-time feel
-  const [agentCount, setAgentCount] = useState(Math.floor(Math.random() * 6) + 10);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAgentCount(prev => Math.max(8, Math.min(20, prev + Math.floor(Math.random() * 5) - 2)));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Live elapsed timer — counts up from when dashboard loads
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const formatElapsed = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}m ${s.toString().padStart(2, "0")}s elapsed`;
-  };
 
   return (
     <header className="h-16 bg-zinc-900 border-b border-white/10 flex items-center justify-between px-6 z-10 relative shrink-0">
@@ -92,13 +69,18 @@ export function Header({ onNotificationClick, organization, userName, onSearch }
       <div className="flex items-center gap-6 pl-6">
         <div className="flex flex-col items-end">
           <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]"></span>
+            {isAgentRunning ? (
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]"></span>
+              </span>
+            ) : (
+              <span className="inline-flex rounded-full h-2.5 w-2.5 bg-zinc-600"></span>
+            )}
+            <span className={`text-sm font-bold tabular-nums ${isAgentRunning ? "text-emerald-400" : "text-zinc-500"}`}>
+              {isAgentRunning ? "Agent running" : "Agent idle"}
             </span>
-            <span className="text-sm font-bold text-emerald-400 tabular-nums">{agentCount} Agents Running</span>
           </div>
-          <span className="text-[10px] text-zinc-500 font-mono tabular-nums">{formatElapsed(elapsed)}</span>
         </div>
         
         <div className="h-8 w-px bg-white/10" />
