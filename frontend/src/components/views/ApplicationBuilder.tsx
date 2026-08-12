@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Save, FileText, Paperclip, Sparkles, CheckCircle2, Circle, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, FileText, Paperclip, Sparkles, CheckCircle2, Circle, Send, Loader2, Calculator, Award, Globe, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Grant, Organization } from "@/types";
 import { runApplicationAgent, AgentEvent } from "@/services/ai";
+import { BudgetCalculatorModal } from "@/components/BudgetCalculatorModal";
+import { PeerReviewModal } from "@/components/PeerReviewModal";
+import { FunderIntelligenceModal } from "@/components/FunderIntelligenceModal";
+import { generateExecutiveFactsheetPdf } from "@/lib/factsheetPdf";
 
 export function ApplicationBuilder({ 
   onBack, 
@@ -32,8 +36,12 @@ export function ApplicationBuilder({
   const [fieldsNeedingHumanInput, setFieldsNeedingHumanInput] = useState<string[]>([]);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [loading, setLoading] = useState(false);
-
   const [files, setFiles] = useState<{ name: string; size: string }[]>([]);
+
+  // Modals state
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showPeerReviewModal, setShowPeerReviewModal] = useState(false);
+  const [showFunderIntelModal, setShowFunderIntelModal] = useState(false);
 
   useEffect(() => {
     const defaultFiles = [];
@@ -81,7 +89,6 @@ export function ApplicationBuilder({
         }
         setLoading(false);
       } else {
-        // Fallback or empty state if no grant selected (shouldn't happen in this flow)
          setContent({
             overview: organization.name,
             mission: organization.mission,
@@ -113,12 +120,12 @@ export function ApplicationBuilder({
   };
 
   if (!grant && !loading) {
-      return (
-          <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center text-zinc-500">
-              <p>No grant selected. Please go back and select a grant.</p>
-              <button onClick={onBack} className="mt-4 text-emerald-500 hover:underline">Back to Applications</button>
-          </div>
-      )
+    return (
+      <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center text-zinc-500">
+        <p>No grant selected. Please go back and select a grant.</p>
+        <button onClick={onBack} className="mt-4 text-emerald-500 hover:underline">Back to Applications</button>
+      </div>
+    );
   }
 
   return (
@@ -134,24 +141,56 @@ export function ApplicationBuilder({
             <p className="text-xs text-zinc-500">Drafting for: {grant?.title || "New Application"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+
+        {/* AI Action Toolbar */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowBudgetModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs font-semibold transition-all"
+          >
+            <Calculator size={13} /> Budget AI
+          </button>
+
+          <button
+            onClick={() => setShowPeerReviewModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 text-violet-300 rounded-lg text-xs font-semibold transition-all"
+          >
+            <Award size={13} /> Peer Review AI
+          </button>
+
+          <button
+            onClick={() => setShowFunderIntelModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 rounded-lg text-xs font-semibold transition-all"
+          >
+            <Globe size={13} /> Funder Benchmark
+          </button>
+
+          <button
+            onClick={() => generateExecutiveFactsheetPdf(organization)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 rounded-lg text-xs font-semibold transition-all"
+          >
+            <Download size={13} /> PDF Brief
+          </button>
+
+          <div className="w-px h-6 bg-white/10 mx-1" />
+
           <div className="flex flex-col items-end">
-            <span className="text-xs text-zinc-400 mb-1">{progress}% Complete</span>
-            <div className="w-32 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <span className="text-xs text-zinc-400 mb-0.5">{progress}% Complete</span>
+            <div className="w-24 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
-          
+
           {progress === 100 ? (
-             <button 
-               onClick={handleApply}
-               className="flex items-center gap-2 px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all hover:scale-105 animate-pulse"
-             >
-              <Send size={16} /> Apply Now
+            <button 
+              onClick={handleApply}
+              className="flex items-center gap-2 px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all hover:scale-105 animate-pulse ml-2"
+            >
+              <Send size={14} /> Submit Application
             </button>
           ) : (
-            <button className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-500 text-sm font-bold rounded-lg cursor-not-allowed">
-              <FileText size={16} /> Apply Now
+            <button className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-500 text-xs font-bold rounded-lg cursor-not-allowed ml-2">
+              <FileText size={14} /> Submit Application
             </button>
           )}
         </div>
@@ -160,14 +199,13 @@ export function ApplicationBuilder({
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-5xl mx-auto grid grid-cols-12 gap-8">
-          
           {/* Sidebar Navigation */}
           <div className="col-span-3 space-y-2">
             <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Sections</h3>
             {sections.map((section) => (
               <button 
                 key={section.id}
-                onClick={() => toggleSection(section.id)} // For demo purposes, clicking toggles completion
+                onClick={() => toggleSection(section.id)}
                 className={cn(
                   "w-full flex items-center justify-between p-3 rounded-lg text-sm font-medium transition-colors border",
                   section.completed 
@@ -179,139 +217,144 @@ export function ApplicationBuilder({
                 {section.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
               </button>
             ))}
-          </div>
 
-          {/* Form Content */}
-          <div className="col-span-9 space-y-8">
-            {/* AI Banner */}
-            <div className="bg-gradient-to-r from-emerald-900/20 to-cyan-900/20 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-3">
-              <Sparkles className="text-emerald-400 shrink-0 mt-0.5" size={18} />
-              <div>
-                <h3 className="text-sm font-medium text-emerald-400 mb-1">Drafted by the Application Agent</h3>
-                <p className="text-xs text-zinc-300">
-                  Narrative sections below were drafted from your organization profile and this
-                  opportunity's published requirements. Anything the agent could not derive is listed
-                  as needing your input rather than invented. Review and edit before submitting.
+            {fieldsNeedingHumanInput.length > 0 && (
+              <div className="mt-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
+                  <Sparkles size={14} /> Input Needed
+                </div>
+                <p className="text-xs text-amber-200/80 leading-relaxed">
+                  The agent requires specific details for:
                 </p>
-              </div>
-            </div>
-
-            {!loading && fieldsNeedingHumanInput.length > 0 && (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-                <h3 className="text-sm font-medium text-amber-400 mb-2">Agent flagged these for your input</h3>
-                <ul className="text-xs text-zinc-300 space-y-1 list-disc list-inside">
-                  {fieldsNeedingHumanInput.map((f, i) => (
-                    <li key={i}>{f}</li>
-                  ))}
+                <ul className="text-xs text-amber-300 font-mono list-disc list-inside">
+                  {fieldsNeedingHumanInput.map(f => <li key={f}>{f}</li>)}
                 </ul>
               </div>
             )}
+          </div>
 
+          {/* Form Content */}
+          <div className="col-span-9 space-y-6">
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
-                    <Loader2 className="animate-spin mb-4 text-emerald-500" size={32} />
-                    <p className="mb-4">Application Agent is preparing your package...</p>
-                    <ul className="text-xs text-left space-y-1 max-w-md w-full">
-                      {agentEvents.slice(-5).map((e, i) => (
-                        <li key={i} className="text-zinc-400">
-                          <span className="text-amber-400 font-mono">[{e.agent}]</span> {e.detail}
-                        </li>
-                      ))}
-                    </ul>
+              <div className="bg-zinc-900 border border-white/10 rounded-xl p-12 text-center flex flex-col items-center justify-center space-y-4">
+                <Loader2 size={32} className="text-emerald-500 animate-spin" />
+                <div>
+                  <h3 className="text-white font-medium mb-1">GrantWeave Agent Draft Pipeline Running</h3>
+                  <p className="text-xs text-zinc-400">Synthesizing narrative sections from organization memory & funder criteria…</p>
                 </div>
+              </div>
             ) : (
-                <div className="space-y-6">
-                <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
-                    <h3 className="text-lg font-medium text-white mb-4">Organization Overview</h3>
-                    <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Legal Name</label>
-                        <input type="text" defaultValue={organization.name} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Mission Statement</label>
-                        <textarea 
-                        rows={3} 
-                        value={content.mission}
-                        onChange={(e) => setContent({...content, mission: e.target.value})}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" 
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Overview for this Grant</label>
-                        <textarea 
-                        rows={4} 
-                        value={content.overview}
-                        onChange={(e) => setContent({...content, overview: e.target.value})}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" 
-                        />
-                    </div>
-                    </div>
-                </section>
-
-                <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
-                    <h3 className="text-lg font-medium text-white mb-4">Project Details</h3>
-                    <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Project Title</label>
-                        <input type="text" defaultValue={grant?.title} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Budget Request</label>
-                        <textarea 
-                            rows={3}
-                            value={content.budget} 
-                            onChange={(e) => setContent({...content, budget: e.target.value})}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none font-mono" 
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-400 mb-1.5">Impact Goals</label>
-                        <textarea 
-                        rows={4} 
-                        value={content.impact}
-                        onChange={(e) => setContent({...content, impact: e.target.value})}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500/50 focus:outline-none font-mono text-sm" 
-                        />
-                    </div>
-                    </div>
-                </section>
-
-                <section className="bg-zinc-900 border border-white/10 rounded-xl p-6">
-                    <h3 className="text-lg font-medium text-white mb-4">Attachments</h3>
-                    <div className="border-2 border-dashed border-zinc-800 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-zinc-700 transition-colors cursor-pointer relative">
-                      <input 
-                        type="file" 
-                        multiple 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onChange={handleFileUpload}
-                      />
-                      <Paperclip className="text-zinc-500 mb-2" />
-                      <p className="text-sm text-zinc-400">Click or drag and drop supporting documents</p>
-                      <p className="text-xs text-zinc-600 mt-1">PDF, DOCX up to 10MB</p>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      {files.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg border border-white/5">
-                            <div className="flex items-center gap-3">
-                            <FileText size={16} className="text-emerald-500" />
-                            <span className="text-sm text-zinc-300">{file.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-zinc-500">{file.size}</span>
-                              {file.size !== "Auto-attached" && (
-                                <button onClick={() => removeFile(file.name)} className="text-zinc-600 hover:text-red-400">×</button>
-                              )}
-                            </div>
-                        </div>
-                      ))}
-                    </div>
-                </section>
+              <>
+                {/* Project Abstract */}
+                <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white font-medium">1. Project Abstract & Overview</h3>
+                    <span className="text-xs text-zinc-500 font-mono">Agent Drafted</span>
+                  </div>
+                  <textarea 
+                    value={content.overview}
+                    onChange={(e) => setContent({ ...content, overview: e.target.value })}
+                    rows={4}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50"
+                  />
                 </div>
+
+                {/* Statement of Need */}
+                <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white font-medium">2. Statement of Need & Mission Alignment</h3>
+                    <span className="text-xs text-zinc-500 font-mono">Agent Drafted</span>
+                  </div>
+                  <textarea 
+                    value={content.mission}
+                    onChange={(e) => setContent({ ...content, mission: e.target.value })}
+                    rows={4}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+
+                {/* Budget Narrative */}
+                <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white font-medium flex items-center gap-2">
+                      3. Budget Request Narrative
+                      <button
+                        onClick={() => setShowBudgetModal(true)}
+                        className="text-xs text-emerald-400 hover:underline flex items-center gap-1 font-mono"
+                      >
+                        <Calculator size={12} /> Open Calculator
+                      </button>
+                    </h3>
+                    <span className="text-xs text-zinc-500 font-mono">Agent Drafted</span>
+                  </div>
+                  <textarea 
+                    value={content.budget}
+                    onChange={(e) => setContent({ ...content, budget: e.target.value })}
+                    rows={4}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 font-mono"
+                  />
+                </div>
+
+                {/* Attachments Section */}
+                <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 space-y-4">
+                  <h3 className="text-white font-medium">5. Attachments & Verification Documents</h3>
+                  <div className="border-2 border-dashed border-zinc-800 rounded-xl p-6 text-center hover:border-zinc-700 transition-colors relative">
+                    <input 
+                      type="file" 
+                      multiple 
+                      onChange={handleFileUpload} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                    />
+                    <Paperclip className="mx-auto text-zinc-500 mb-2" size={24} />
+                    <p className="text-sm text-zinc-400">Drag & drop additional files here, or <span className="text-emerald-400 font-semibold">browse</span></p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {files.map((file) => (
+                      <div key={file.name} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg border border-white/5 text-sm">
+                        <div className="flex items-center gap-3">
+                          <FileText size={16} className="text-zinc-400" />
+                          <span className="text-zinc-200">{file.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-mono text-zinc-500">{file.size}</span>
+                          <button onClick={() => removeFile(file.name)} className="text-xs text-zinc-500 hover:text-red-400">Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      {showBudgetModal && (
+        <BudgetCalculatorModal
+          grant={grant}
+          organization={organization}
+          onClose={() => setShowBudgetModal(false)}
+          onInsertNarrative={(narrative) => setContent((prev) => ({ ...prev, budget: narrative }))}
+        />
+      )}
+
+      {showPeerReviewModal && (
+        <PeerReviewModal
+          grant={grant}
+          proposalText={`${content.overview}\n${content.mission}\n${content.budget}`}
+          onClose={() => setShowPeerReviewModal(false)}
+        />
+      )}
+
+      {showFunderIntelModal && (
+        <FunderIntelligenceModal
+          grant={grant}
+          organization={organization}
+          onClose={() => setShowFunderIntelModal(false)}
+        />
+      )}
     </div>
   );
 }
