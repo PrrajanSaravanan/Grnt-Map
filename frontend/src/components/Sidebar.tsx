@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, Settings, BarChart3, Users, LayoutDashboard, PenTool, ShieldCheck, Target, Wallet, MapPin, PanelLeftClose, ChevronRight } from "lucide-react";
+import { User, Settings, BarChart3, Users, LayoutDashboard, PenTool, ShieldCheck, Target, Wallet, MapPin, PanelLeftClose, ChevronRight, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Organization } from "@/types";
 
@@ -16,6 +16,7 @@ export function Sidebar({ currentView, onNavigate, organization, userName }: Sid
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "applications", label: "My Applications", icon: PenTool },
+    { id: "calendar", label: "Timeline Calendar", icon: Calendar },
     { id: "reports", label: "Reports", icon: BarChart3 },
     { id: "collab", label: "Team Collab", icon: Users },
     { id: "settings", label: "Settings", icon: Settings },
@@ -79,9 +80,6 @@ export function Sidebar({ currentView, onNavigate, organization, userName }: Sid
       {/* Navigation */}
       <div className="p-3 space-y-6 flex-1 overflow-y-auto overflow-x-hidden">
         <nav className="space-y-1.5">
-          {!isCollapsed && (
-            <h4 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2 px-2">Navigation</h4>
-          )}
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             return (

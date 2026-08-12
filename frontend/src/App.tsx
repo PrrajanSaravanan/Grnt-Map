@@ -14,6 +14,7 @@ import { TeamCollab } from "@/components/views/TeamCollab";
 import { Settings } from "@/components/views/Settings";
 import { ApplicationBuilder } from "@/components/views/ApplicationBuilder";
 import { MyApplications } from "@/components/views/MyApplications";
+import { CalendarView } from "@/components/views/CalendarView";
 import { Login } from "@/components/views/Login";
 import { ApplicationPackageView } from "@/components/views/ApplicationPackageView";
 import { ReactFlowProvider } from "@xyflow/react";
@@ -257,6 +258,8 @@ export default function App() {
                </div>
                {/* Timeline removed as per user request */}
             </div>
+          ) : currentView === "calendar" ? (
+            <CalendarView applications={myApplications} onOpenBuilder={handleOpenBuilder} />
           ) : currentView === "applications" ? (
             <MyApplications 
               applications={myApplications}
